@@ -1,9 +1,10 @@
 # Android integration
 
-XDB is pinned to v1.0.1 / 6248da9f5a6ccdca345f45858f4a0c3fe8ef5a76.
+XDB is pinned to Android NSD development revision
+f797fe38174e514252898c28e591fe8a4376bb83 (based on v1.0.1).
 The build script rejects another commit or tracked SDK modifications. The App
 never runs an external xdb executable, changes XDB_PORT, reads pairing records,
-or substitutes Android system discovery for the pinned SDK implementation.
+or implements discovery independently of the pinned SDK.
 
 - JNI starts Server with port 0 and filesDir/xdb, then connects each client using
   xdb_server_port. Independent embedded Apps use independent ports and credentials.
@@ -37,12 +38,22 @@ returns to the list. Home/volume/side-button actions live in the mirror menu.
 v1.0.1 exposes no host-branding option. Preserve `xdb - <Android model>` and Apple's
 DNS-SD types. Do not patch SDK strings to present a different brand.
 
-A later NsdManager backend should subscribe continuously to only
-`_remotepairing._tcp.local.` and advertise
-`_remotepairing-pairable-host._tcp.local.` during pairing. Server, not the UI,
-should maintain the cache and match credentials. Validate IPv6 scope, multiple
-interfaces, TXT/address changes, removals, network/lifecycle transitions and exact
-pairing advertisement compatibility; preserve a fallback where necessary.
+## Native discovery lifecycle
+
+The App compiles the SDK's `org.xdevicebridge.NsdDiscovery` source and R8 rules.
+NativeBridge acquires one NSD lease per runtime, before Server startup, and closes
+it on stop. API 34+ shares a process-level Wi-Fi/Ethernet subscription to only
+`_remotepairing._tcp.`. Service-info callbacks replace TXT/address/port snapshots;
+service/network loss removes entries. The Server performs credential matching.
+A manual Refresh reuses the current runtime and snapshot; it does not restart the
+subscription. Backgrounding still stops Server and releases the final NSD lease.
+The SDK contains the adapter; the App owns only its Context and lifecycle.
+
+On API 26–33, or when NSD is unavailable, the SDK uses direct mDNS. The App retains
+its MulticastLock for that fallback and pairing. The Apple pairing advertiser is
+unchanged: Android's public registration API cannot set its exact SRV target.
+No new branding configuration, background service, discovery polling timer or
+credential store is added.
 
 ## Distribution
 
@@ -56,7 +67,7 @@ included in its source and fetched from the pinned recipes when rebuilding.
 
 ## Android HTTPS trust integration
 
-The SDK checkout remains unmodified v1.0.1. Before starting Server, the JNI
+The pinned SDK checkout remains unmodified. Before starting Server, the JNI
 wrapper exports Android's default X509TrustManager accepted roots into an
 App-private PEM bundle. An App-owned link wrapper around the static libcurl's
 curl_easy_init configures new handles with this CA file explicitly. It does not

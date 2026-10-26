@@ -22,7 +22,7 @@ class EmbeddedSdkTest {
         while(!test()) { if(System.nanoTime()>until) fail("Condition timed out"); Thread.sleep(50) }
     }
     @Test fun twoInProcessServersUseDistinctPortsAndExactSdk() {
-        val a=data(); val b=data(); val r1=NativeBridge.start(a.absolutePath);val r2=NativeBridge.start(b.absolutePath)
+        val a=data(); val b=data(); val r1=NativeBridge.start(context, a.absolutePath);val r2=NativeBridge.start(context, b.absolutePath)
         try {
             assertTrue(NativeBridge.port(r1)>0)
             assertNotEquals(NativeBridge.port(r1),NativeBridge.port(r2))
@@ -40,7 +40,7 @@ class EmbeddedSdkTest {
         } finally { NativeBridge.stop(r1);NativeBridge.stop(r2);a.deleteRecursively();b.deleteRecursively() }
     }
     @Test fun interruptionCanRaceRequestAndCloseWithoutDanglingHandles() {
-        val dir=data();val r=NativeBridge.start(dir.absolutePath);val c=NativeBridge.connect(r,NativeEvents {})
+        val dir=data();val r=NativeBridge.start(context, dir.absolutePath);val c=NativeBridge.connect(r,NativeEvents {})
         val worker=Executors.newSingleThreadExecutor()
         try {
             val task=worker.submit { runCatching { NativeBridge.request(r,c,"devices","{\"transport\":\"wifi\",\"timeout_ms\":5000}") } }
@@ -54,7 +54,7 @@ class EmbeddedSdkTest {
     }
     @Test fun foregroundNetworkAndBackgroundTransitionsReleaseListeningSocket() {
         val root=data();val cache=File(context.cacheDir,"test-${UUID.randomUUID()}").apply{mkdirs()}
-        val controller=SessionController(root,cache,{}, { it.bitmap.recycle() })
+        val controller=SessionController(context,root,cache,{}, { it.bitmap.recycle() })
         try {
             repeat(3) {
                 controller.resume();waitUntil { controller.serverPort()>0 }

@@ -120,7 +120,7 @@ class MainActivity : AppCompatActivity() {
         }
         mirrorPage.addView(menu, FrameLayout.LayoutParams(dp(56), dp(48), Gravity.TOP or Gravity.END).apply { setMargins(dp(12), dp(12), dp(12), 0) })
         root.addView(mirrorPage, FrameLayout.LayoutParams(-1, -1))
-        controller = SessionController(filesDir, cacheDir, { render(it) }, { mirror.submit(it) })
+        controller = SessionController(applicationContext, filesDir, cacheDir, { render(it) }, { mirror.submit(it) })
         mirror.acceptsFrame = controller::acceptsFrame; mirror.onTouch = controller::touch
         onBackPressedDispatcher.addCallback(this) { if (state.mirroring) disconnect() else finish() }
         setContentView(root); render(state)

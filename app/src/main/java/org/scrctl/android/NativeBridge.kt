@@ -1,5 +1,8 @@
 package org.scrctl.android
 
+import android.content.Context
+import org.xdevicebridge.NsdDiscovery
+import java.util.concurrent.ConcurrentHashMap
 import android.graphics.Bitmap
 import android.util.Base64
 import java.io.File
@@ -13,7 +16,8 @@ object NativeBridge {
     init { System.loadLibrary("scrctl_jni") }
     // Android certificate filenames use the old subject hash. Export the platform
     // TrustManager roots as PEM for the unchanged SDK's OpenSSL-based downloader.
-    @Synchronized fun start(directory: String): Long {
+    private val discovery = ConcurrentHashMap<Long, NsdDiscovery>()
+    @Synchronized fun start(context: Context, directory: String): Long {
         val factory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
         factory.init(null as KeyStore?)
         val roots = factory.trustManagers.filterIsInstance<X509TrustManager>()
@@ -33,7 +37,12 @@ object NativeBridge {
             }
             check(temporary.renameTo(bundle)) { "Cannot prepare Android system trust store" }
         } finally { temporary.delete() }
-        return startNative(directory, bundle.absolutePath)
+        val lease = NsdDiscovery.acquire(context)
+        try {
+            val runtime = startNative(directory, bundle.absolutePath)
+            discovery[runtime] = lease
+            return runtime
+        } catch (error: Throwable) { lease.close(); throw error }
     }
     private external fun startNative(directory: String, caFile: String): Long
     external fun port(runtime: Long): Int
@@ -42,5 +51,8 @@ object NativeBridge {
     external fun interrupt(runtime: Long, client: Long)
     external fun interruptAll(runtime: Long)
     external fun close(runtime: Long, client: Long)
-    external fun stop(runtime: Long)
+    fun stop(runtime: Long) {
+        try { stopNative(runtime) } finally { discovery.remove(runtime)?.close() }
+    }
+    private external fun stopNative(runtime: Long)
 }

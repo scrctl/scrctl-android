@@ -3,8 +3,8 @@
 A focused native Kotlin / Material 3 Android frontend for iPhone Wi-Fi mirroring
 and control, and an application-sandbox validation host for XDeviceBridge.
 
-The SDK is pinned to **XDeviceBridge v1.0.1**, commit
-`6248da9f5a6ccdca345f45858f4a0c3fe8ef5a76`.
+The SDK is pinned to the **XDeviceBridge Android NSD development revision**
+`f797fe38174e514252898c28e591fe8a4376bb83` (based on v1.0.1).
 The App embeds libxdb_server and libxdb_client through JNI. It never executes an
 external xdb program. Pairing records belong to xdb in App-private persistent
 storage; the App does not parse credentials. DDI uses App cache storage.
@@ -22,8 +22,9 @@ automated tests and real-device acceptance are recorded separately in
 
 v1.0.1 has no public branding configuration. Pairing retains its existing
 `xdb - <Android model>` display name and Apple DNS-SD service types.
-NsdManager discovery/advertisement is deferred; the initial App uses the SDK's
-existing mDNS implementation.
+Android 14/API 34+ uses the SDK's NsdManager subscription for discovery. Earlier
+Android versions and unavailable native discovery use direct mDNS. Pairing
+advertisements retain the SDK's existing implementation.
 
 ## Build
 

@@ -46,3 +46,28 @@ fresh install and subsequent mirroring are not yet claimed; follow-up is pending
 
 CI builds APKs, runs JVM tests and lint, and collects corresponding sources.
 It cannot replace real iPhone pairing, visual/input or DDI installation acceptance.
+
+## NSD SDK integration (2026-10-27)
+
+SDK revision: `f797fe3` (development snapshot based on v1.0.1). Debug APK,
+Android-test APK, five JVM geometry tests and Android lint pass with JDK 17,
+SDK 36 and NDK 29. The APK was installed over the existing App on the same Xiaomi
+13 Ultra/API 36; its private credentials were preserved.
+
+All five instrumentation tests pass with hardware acceptance enabled. In addition
+to the three initial tests, these cover a system-registered test peer reaching the
+native SDK device list, warm discovery in under two seconds, lost-service eviction,
+shared NSD leases and final-close cleanup. An opt-in test identifies the existing
+paired iPhone14,4 / iOS 27.0.1 using NSD, opens a Wi-Fi session and receives three
+advancing decoded frames before stopping video and closing normally.
+
+The foreground App UI also discovered the paired iPhone and displayed its visible
+lock screen in the fullscreen mirror. Backgrounding released the App UID's active
+NSD discovery and service-info requests, verified through Android system diagnostics.
+No pairing or DDI changes were needed in this round. A manual Refresh now reuses
+the server/subscription instead of restarting both.
+
+Native NSD is enabled on API 34+; lower releases retain the SDK's direct backend.
+The pairing advertiser is unchanged because public Android registration cannot set
+the exact SRV target. Physical network switching and simultaneous Ethernet/Wi-Fi
+remain unverified; the automated network test exercises controller transitions.

@@ -9,13 +9,13 @@ import shutil
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
-PIN = '6248da9f5a6ccdca345f45858f4a0c3fe8ef5a76'
+PIN = 'f797fe38174e514252898c28e591fe8a4376bb83'
 def run(*args):
     subprocess.run([str(a) for a in args], cwd=ROOT, check=True)
 def main():
     revision = subprocess.check_output(['git', '-C', str(ROOT/'xdb'), 'rev-parse', 'HEAD'], text=True).strip()
     if revision != PIN or subprocess.check_output(['git','-C',str(ROOT/'xdb'),'diff','HEAD','--'],text=True):
-        raise SystemExit('xdb must be an unmodified v1.0.1 checkout: '+PIN)
+        raise SystemExit('xdb must be an unmodified pinned SDK checkout: '+PIN)
     sdk = Path(os.environ.get('ANDROID_HOME', str(Path.home()/'Library/Android/sdk')))
     ndk = Path(os.environ.get('ANDROID_NDK_ROOT', str(sdk/'ndk/29.0.14206865')))
     host = 'darwin-x86_64' if platform.system() == 'Darwin' else 'linux-x86_64'

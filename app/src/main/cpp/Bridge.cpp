@@ -265,7 +265,7 @@ JNI(void, close)(JNIEnv *, jobject, jlong id, jlong key) {
   } catch (...) {
   }
 }
-JNI(void, stop)(JNIEnv *, jobject, jlong id) {
+JNI(void, stopNative)(JNIEnv *, jobject, jlong id) {
   std::shared_ptr<Runtime> r;
   {
     std::lock_guard lock(registry_mutex);
