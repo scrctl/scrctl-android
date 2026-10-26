@@ -1,5 +1,6 @@
 package org.scrctl.android
 
+import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import org.json.JSONObject
@@ -15,7 +16,7 @@ data class Device(val udid: String, val name: String, val pairing: String, val c
 data class UiState(val message: String, val busy: Boolean = false, val mirroring: Boolean = false,
                    val pin: String? = null, val devices: List<Device>? = null)
 
-class SessionController(private val files: File, private val cache: File,
+class SessionController(private val context: Context, private val files: File, private val cache: File,
                         private val update: (UiState) -> Unit, private val frame: (VideoFrame) -> Unit) {
     private val main = Handler(Looper.getMainLooper())
     private val operations = Executors.newSingleThreadExecutor()
@@ -99,7 +100,7 @@ class SessionController(private val files: File, private val cache: File,
             if (!valid(g)) return@execute
             try {
                 val directory = File(files, "xdb").apply { mkdirs() }
-                val r = NativeBridge.start(directory.absolutePath); runtime.set(r)
+                val r = NativeBridge.start(context, directory.absolutePath); runtime.set(r)
                 if (!valid(g)) { stopCurrent(); return@execute }
                 val c = connect(r, g)
                 try { rpc(r, c, "server.info") } finally { NativeBridge.close(r, c) }
@@ -146,7 +147,11 @@ class SessionController(private val files: File, private val cache: File,
             } finally { requestClient.compareAndSet(c, 0); if (c != 0L) NativeBridge.close(r, c) }
         }
     }
-    fun refresh() { wantMirror = false; restart("Discovering iPhones…") }
+    fun refresh() {
+        wantMirror = false
+        if (runtime.get() == 0L) restart("Discovering iPhones…")
+        else operation("Discovering iPhones…") { r, g, _ -> discover(r, g) }
+    }
     fun pair() = operation("Waiting for iPhone pairing…") { r, g, c ->
         rpc(r, c, "pair", JSONObject().put("transport", "wifi").put("timeout_ms", 120000))
         if (cancelled.get()) throw InterruptedException()

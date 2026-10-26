@@ -11,6 +11,8 @@ android {
         ndk { abiFilters += "arm64-v8a" }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
+    sourceSets["main"].java.srcDir(rootProject.file("xdb/android/src/main/java"))
+    buildTypes { getByName("release") { proguardFiles(rootProject.file("xdb/android/consumer-rules.pro")) } }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
     sourceSets["main"].jniLibs.srcDir(layout.buildDirectory.dir("native-libs"))
