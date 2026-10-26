@@ -40,6 +40,10 @@ export ANDROID_HOME=/absolute/path/to/Android/sdk
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
+For device tests on an already paired phone, preserve its App data: use
+`adb install -r` and `adb shell am instrument` rather than uninstalling the App.
+The project configures Gradle connected tests to leave APKs installed afterward.
+
 Select an iPhone from the initial list, prepare DDI if necessary, then Connect.
 The mirror is fullscreen; Android Back returns to the list. Its small control menu
 provides Home, volume and Lock. For first-time Wi-Fi pairing, select Wi-Fi pair,

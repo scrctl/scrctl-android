@@ -52,7 +52,7 @@ It cannot replace real iPhone pairing, visual/input or DDI installation acceptan
 SDK revision: `f797fe3` (development snapshot based on v1.0.1). Debug APK,
 Android-test APK, five JVM geometry tests and Android lint pass with JDK 17,
 SDK 36 and NDK 29. The APK was installed over the existing App on the same Xiaomi
-13 Ultra/API 36; its private credentials were preserved.
+13 Ultra/API 36. The direct instrumentation runs used the existing App record.
 
 All five instrumentation tests pass with hardware acceptance enabled. In addition
 to the three initial tests, these cover a system-registered test peer reaching the
@@ -71,3 +71,27 @@ Native NSD is enabled on API 34+; lower releases retain the SDK's direct backend
 The pairing advertiser is unchanged because public Android registration cannot set
 the exact SRV target. Physical network switching and simultaneous Ethernet/Wi-Fi
 remain unverified; the automated network test exercises controller transitions.
+
+
+### Device-test cleanup incident
+
+A subsequent `connectedDebugAndroidTest` run passed all five tests, but the
+Android Gradle plugin then uninstalled both target and test APKs by default,
+removing the App's private data. The App was reinstalled. The original Android
+record had no local backup; an existing Mac xdb record was copied directly into
+App-private storage under the user's prior authorization to use it for Android
+debugging. Its contents were not logged. The hardware test was rerun through
+`adb shell am instrument`, which does not uninstall the App afterward.
+
+`android.injected.androidTest.leaveApksInstalledAfterRun=true` is now set for the
+pinned Android Gradle plugin. Prefer explicit `adb install -r` and `am instrument`
+for a previously paired host; do not use clean/uninstall operations against its
+private data. The NSD feature itself does not import or migrate credentials.
+
+The user then completed a new Wi-Fi pairing through the App. The resulting
+App-private record was checked to differ from the temporary Mac record, and the
+App's list identified the newly paired iPhone using the active NSD subscription.
+All five direct instrumentation tests passed again with this fresh Android
+record (5.65 seconds), including the Wi-Fi connection and advancing video frames.
+The temporary recovery copy was deleted. The installed APK's SHA-256 matched the
+final local artifact, and direct instrumentation left the App/data installed.
