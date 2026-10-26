@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Build the exact SDK and its JNI bridge; no device operations."""
 import os
+import hashlib
+import json
+import platform
 from pathlib import Path
 import shutil
 import subprocess
@@ -15,6 +18,7 @@ def main():
         raise SystemExit('xdb must be an unmodified v1.0.1 checkout: '+PIN)
     sdk = Path(os.environ.get('ANDROID_HOME', str(Path.home()/'Library/Android/sdk')))
     ndk = Path(os.environ.get('ANDROID_NDK_ROOT', str(sdk/'ndk/29.0.14206865')))
+    host = 'darwin-x86_64' if platform.system() == 'Darwin' else 'linux-x86_64'
     deps = ROOT/'.native/deps'
     if not (deps/'lib/libswscale.so').exists():
         env = dict(os.environ, ANDROID_NDK_ROOT=str(ndk), JOBS='4')
@@ -34,7 +38,23 @@ def main():
     # Package one shared C++ runtime for all native DSOs.
     libraries=[ROOT/'.native/build/libscrctl_jni.so', ROOT/'.native/build/xdb/libxdb_client.so',
                ROOT/'.native/build/xdb/libxdb_server.so',
-               ndk/'toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so']
+               ndk/f'toolchains/llvm/prebuilt/{host}/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so']
     libraries += [deps/f'lib/lib{name}.so' for name in ['avcodec','avutil','swscale']]
     for lib in libraries: shutil.copy2(lib,target/lib.name)
+    assets=ROOT/'app/build/native-assets'; notices=assets/'licenses'; notices.mkdir(parents=True,exist_ok=True)
+    def notice(source, name):
+        if source.is_file():
+            destination=notices/name;destination.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(source,destination)
+    for name in ['LICENSE','COPYING.GPLv3','THIRD_PARTY_NOTICES.md']:
+        notice(ROOT/'xdb'/name,Path('XDeviceBridge')/name)
+    for component in ['openssl-3.5.9','curl-8.23.0','ffmpeg-9.0.2']:
+        for source in (ROOT/'.native/src'/component).glob('*'):
+            if source.name.startswith(('LICENSE','COPYING','NOTICE')): notice(source,Path(component)/source.name)
+    for component in ['nlohmann_json','pugixml','mdns','lwip']:
+        for source in (ROOT/'.native/build/_deps'/f'{component}-src').glob('*'):
+            if source.name.startswith(('LICENSE','COPYING','NOTICE')): notice(source,Path(component)/source.name)
+    notice(ndk/'NOTICE.toolchain',Path('NDK/NOTICE.toolchain'))
+    metadata={'sdk_version':'1.0.1','sdk_commit':PIN,'ndk':'29.0.14206865',
+              'libraries':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in target.glob('*.so')}}
+    (assets/'native-build.json').write_text(json.dumps(metadata,indent=2)+'\n')
 if __name__=='__main__': main()

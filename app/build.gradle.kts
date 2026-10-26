@@ -14,6 +14,7 @@ android {
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
     sourceSets["main"].jniLibs.srcDir(layout.buildDirectory.dir("native-libs"))
+    sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("native-assets"))
     packaging { jniLibs.useLegacyPackaging = false }
 }
 val buildNative by tasks.registering(Exec::class) {

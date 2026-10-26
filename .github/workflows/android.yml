@@ -1,0 +1,49 @@
+name: Android
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          submodules: recursive
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android build tools
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;29.0.14206865'
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            .native/deps
+            .native/src
+          key: android-arm64-ndk29-${{ hashFiles('xdb/tools/android-deps.sh', 'gradle/wrapper/gradle-wrapper.properties') }}
+      - name: Build, unit tests and Android lint
+        run: ./gradlew --no-daemon :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
+      - name: Collect matching native sources
+        run: python3 tools/package_sources.py
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: scrctl-android-debug
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            build/scrctl-android-sources.tar.gz
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: android-test-reports
+          path: |
+            app/build/reports/tests/
+            app/build/reports/lint-results-debug.*
+          if-no-files-found: ignore
