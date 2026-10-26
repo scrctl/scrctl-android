@@ -35,11 +35,13 @@ empty before preparation. The first attempt exposed an OpenSSL CA-store mismatch
 After the App integration supplied Android system trust roots explicitly, the
 pinned SDK downloaded the DDI assets (about 16 MiB) with HTTPS verification enabled.
 Installation then failed while waiting for its final device reply. A successful
-fresh install and subsequent mirroring are not yet claimed; follow-up is pending.
+fresh install and subsequent mirroring were not established by that initial run.
+The unlocked SDK and GUI acceptance below supersedes this pending result.
 
 ## Remaining acceptance boundaries
 
-- Fresh-cache DDI download/install and cancellation on a suitable device.
+- Other cancellation timings during signing or the final device-side commit;
+  cancellation does not promise rollback of completed installation changes.
 - Physical network loss/switch and foreground restoration during an active mirror.
 - Other Android models, 16 KiB page devices, other ABIs and long sessions.
 - Basic Home/volume/Lock controls require separate visible device confirmation.
@@ -119,3 +121,60 @@ App storage; only a digest was retained for comparison. No DDI download, removal
 or fresh installation was performed. This closes the
 Android repeated-query acceptance for this device, not the fresh-install or
 physical network-switch boundaries above.
+
+## Fresh Android DDI installation and GUI recovery (2026-10-27)
+
+SDK revision `bb07cae`, debug App on Xiaomi 13 Ultra/API 36, using the existing
+App-private pairing with iPhone14,4 / iOS 27.0.1. No production App/SDK behavior
+was changed for these checks. The new `DdiLifecycleTest` requires both an explicit
+device identifier and `xdbDdiLifecycle=true`; ordinary test runs skip removal.
+Its separate `xdbDdiInspect=true` case only queries state after an uncertain
+installation, without retrying or changing it.
+
+### SDK lifecycle test in the Android application sandbox
+
+- Removed the existing DDI through the embedded SDK. Independent status confirmed
+  both `mounted:false` and `cryptex_installed:false` before preparation.
+- Created a unique, empty test cache. Interrupted the request after nonzero
+  progress on the image download; the request failed rather than claiming success.
+  Server shutdown joined cancellation cleanup. No staging directory or version
+  lock remained, and independent status still confirmed absence.
+- An initial attempt reached upload completion but timed out waiting for the
+  final installation reply (120-second install budget). A read-only inspection
+  confirmed the DDI was still absent; the test did not blindly replace an
+  uncertain installation. The user then confirmed the iPhone was unlocked and
+  would remain lit.
+- The full lifecycle was rerun with another empty cache. Download cancellation
+  and cleanup took 119 ms; retry still started empty, downloaded and verified the
+  five assets, obtained the Apple ticket, uploaded, installed and verified
+  `com.apple.MobileAsset.DDI` version `27.1.5228.8` in 17.285 seconds.
+- Independent status confirmed installation and mount state. A new authenticated
+  Wi-Fi session received three advancing decoded frames. The opt-in test passed
+  in 30.198 seconds. This timing covers this run; it is not a general download or
+  installation performance guarantee, nor proof that every timeout is lock-related.
+
+### Real Android GUI
+
+- With the App stopped, the Mac CLI removed the DDI and independently confirmed
+  absence. The App's normal `cache/ddi` directory did not yet exist. Using only
+  actual UI taps, selected the paired iPhone and pressed **Prepare DDI**. The
+  screen displayed transfer progress and then **DDI prepared. You can now mirror
+  this iPhone.** This was a fresh GUI download/install, not mounted-image reuse.
+- For the GUI cancellation check, removed the DDI again while the App was stopped
+  and moved that newly downloaded cache aside. Started **Prepare DDI** from the
+  empty normal cache and tapped **Cancel** while transfer progress and the busy
+  indicator were visible. The screen showed **Cancelled. Completed device
+  changes are not rolled back.** and re-enabled Prepare/Connect.
+- Pressed **Prepare DDI** again. The GUI reached the success message after about
+  ten seconds of observation; that retry could reuse assets downloaded before
+  cancellation. Pressing **Connect** opened the actual mirror, visually showing
+  the iPhone's Developer Mode settings screen. A successfully opened mirror page
+  alone was not counted as visible-frame evidence.
+
+The original credential digest remained unchanged throughout. Only test-created
+cache directories were removed; the verified normal App cache was retained.
+Both APKs were installed with `adb install -r`, without clearing App data.
+Build and Android lint passed. The DDI was left installed and mounted; these
+results cover one Android/iPhone pair, not other OS versions or physical network
+switching. Cancellation was exercised at download and GUI transfer boundaries,
+not exhaustively at every device-side commit point.

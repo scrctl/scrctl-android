@@ -44,6 +44,23 @@ For device tests on an already paired phone, preserve its App data: use
 `adb install -r` and `adb shell am instrument` rather than uninstalling the App.
 The project configures Gradle connected tests to leave APKs installed afterward.
 
+An optional DDI lifecycle test **removes the selected iPhone's DDI**, cancels a
+download into a new empty cache, then retries installation and checks video.
+Keep the iPhone unlocked and close other mirroring/developer sessions. Build the
+test APK with `./gradlew :app:assembleDebugAndroidTest`, then opt in explicitly:
+
+```sh
+adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+adb shell am instrument -w -r \
+  -e class org.scrctl.android.DdiLifecycleTest \
+  -e xdbHardwareUdid YOUR_IPHONE_UDID -e xdbDdiLifecycle true \
+  org.scrctl.android.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+This test preserves pairing records and the App's normal DDI cache. A successful
+run leaves the DDI installed. An interrupted/failed run can leave it absent; query
+its state and prepare again before mirroring. Ordinary test runs skip this case.
+
 Select an iPhone from the initial list, prepare DDI if necessary, then Connect.
 The mirror is fullscreen; Android Back returns to the list. Its small control menu
 provides Home, volume and Lock. For first-time Wi-Fi pairing, select Wi-Fi pair,
