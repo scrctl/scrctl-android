@@ -1,0 +1,4 @@
+<resources><style name="Theme.Scrctl" parent="Theme.Material3.DayNight.NoActionBar">
+    <item name="colorPrimary">#167D68</item><item name="colorSecondary">#31738B</item>
+    <item name="android:windowLightStatusBar">true</item>
+</style></resources>
