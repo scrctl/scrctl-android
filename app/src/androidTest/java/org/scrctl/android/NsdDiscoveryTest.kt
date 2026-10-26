@@ -132,4 +132,25 @@ class NsdDiscoveryTest {
             rpc("video.stop"); rpc("connection.close")
         } finally { NativeBridge.close(runtime, client); NativeBridge.stop(runtime) }
     }
+
+    @Test fun pairedIPhoneRepeatsDdiStatusWithoutStaleSessionDelay() {
+        val udid = InstrumentationRegistry.getArguments().getString("xdbHardwareUdid") ?: ""
+        assumeTrue("opt-in prepared iPhone acceptance", udid.isNotEmpty() && Build.VERSION.SDK_INT >= 34)
+        val runtime = NativeBridge.start(context, File(context.filesDir, "xdb").absolutePath)
+        val client = NativeBridge.connect(runtime, NativeEvents {})
+        try {
+            waitUntil("native iPhone discovery") { snapshot().getBoolean("available") && snapshot().getJSONArray("services").length() > 0 }
+            repeat(3) { iteration ->
+                val start = System.nanoTime()
+                val params = JSONObject().put("udid", udid).put("wifi", "auto")
+                val envelope = JSONObject(NativeBridge.request(runtime, client, "ddi.status", params.toString()).json)
+                val elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)
+                // No pairing mutation, image download/removal, or screen contents.
+                println("DDI status iteration=$iteration elapsed_ms=$elapsed")
+                assertTrue(envelope.optJSONObject("error")?.optString("message") ?: "DDI status", envelope.getBoolean("ok"))
+                assertTrue("prepared iPhone required", envelope.getJSONObject("result").getBoolean("mounted"))
+                assertTrue("repeated query must not wait for the old 30-second session expiry", elapsed < 10000)
+            }
+        } finally { NativeBridge.close(runtime, client); NativeBridge.stop(runtime) }
+    }
 }

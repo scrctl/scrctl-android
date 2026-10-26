@@ -95,3 +95,27 @@ All five direct instrumentation tests passed again with this fresh Android
 record (5.65 seconds), including the Wi-Fi connection and advancing video frames.
 The temporary recovery copy was deleted. The installed APK's SHA-256 matched the
 final local artifact, and direct instrumentation left the App/data installed.
+
+## DDI session cleanup integration (2026-10-27)
+
+SDK revision: `bb07cae8364f218cbb2ae3498fae133f8e06d4f5` (based on v1.0.1).
+Debug and test APKs build, the five JVM geometry tests pass (unchanged test inputs
+were reused by Gradle), and Android lint passes. This build used Homebrew OpenJDK
+17; the installed GraalVM 17 failed at Android's JDK-image transform.
+
+Both APKs were installed with `adb install -r` on the same Xiaomi 13 Ultra/API 36.
+All six direct instrumentation tests passed, with no skips (10.086 seconds).
+The new opt-in hardware test performed three successive `ddi.status` requests
+through native NSD discovery and the App-owned pairing record. Each confirmed the
+existing mount; measured times inside Android were 1.203, 1.258 and 1.414 seconds.
+No query waited for the previous image-mounter session's 30-second expiry.
+Existing tests also confirmed discovery lifecycle, cancellation and three
+advancing decoded iPhone frames through an authenticated Wi-Fi connection.
+
+The credential digest was identical before and after installation/tests, and the
+installed APK hash matched the local artifact. The App was left installed and
+relaunched after testing. No credentials were imported, replaced or saved outside
+App storage; only a digest was retained for comparison. No DDI download, removal
+or fresh installation was performed. This closes the
+Android repeated-query acceptance for this device, not the fresh-install or
+physical network-switch boundaries above.
