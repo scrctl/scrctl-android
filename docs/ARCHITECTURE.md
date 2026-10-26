@@ -53,3 +53,20 @@ native notices and version/hash metadata in assets. Matching-source CI artifacts
 include the exact App, SDK and pinned OpenSSL/curl/FFmpeg archives and build cache.
 The NDK toolchain notice covers the C++ runtime. SDK-managed dependencies are
 included in its source and fetched from the pinned recipes when rebuilding.
+
+## Android HTTPS trust integration
+
+The SDK checkout remains unmodified v1.0.1. Before starting Server, the JNI
+wrapper exports Android's default X509TrustManager accepted roots into an
+App-private PEM bundle. An App-owned link wrapper around the static libcurl's
+curl_easy_init configures new handles with this CA file explicitly. It does not
+change verification flags; certificate-chain and hostname checks remain enabled.
+The SDK's TSS code subsequently overrides those defaults with its dedicated Apple
+root blob, preserving its signing policy.
+
+Explicit configuration avoids Android's old certificate filename hashes, the
+Conscrypt APEX directory migration and reliance on environment trust paths
+that OpenSSL ignores when a process has AT_SECURE set. The link adaptation is limited to the
+embedded xdb_server library, does not alter the SDK checkout or public ABI, and
+is part of the App source/build recipe. Native curl handles are not exposed to
+other App components.

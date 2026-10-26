@@ -1,5 +1,6 @@
 #include <android/bitmap.h>
 #include <atomic>
+
 #include <jni.h>
 #include <memory>
 #include <mutex>
@@ -8,6 +9,7 @@
 #include <string>
 #include <unordered_map>
 #include <xdb/xdb.h>
+extern "C" void scrctl_configure_system_roots(const char *path);
 namespace {
 JavaVM *vm;
 std::atomic<jlong> ids{1};
@@ -158,10 +160,11 @@ extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *j, void *) {
 }
 #define JNI(type, name)                                                        \
   extern "C" JNIEXPORT type JNICALL Java_org_scrctl_android_NativeBridge_##name
-JNI(jlong, start)(JNIEnv *e, jobject, jstring directory) {
+JNI(jlong, startNative)(JNIEnv *e, jobject, jstring directory, jstring caFile) {
   try {
     if (std::string(xdb_client_version()) != "1.0.1")
       throw std::runtime_error("SDK must be 1.0.1");
+    scrctl_configure_system_roots(utf8(e, caFile).c_str());
     auto r = std::make_shared<Runtime>();
     r->server = xdb_server_start(0, utf8(e, directory).c_str());
     if (!r->server)

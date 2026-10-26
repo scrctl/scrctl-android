@@ -27,7 +27,7 @@ jobs:
             ~/.gradle/wrapper
             .native/deps
             .native/src
-          key: android-arm64-ndk29-${{ hashFiles('xdb/tools/android-deps.sh', 'gradle/wrapper/gradle-wrapper.properties') }}
+          key: android-arm64-ndk29-${{ hashFiles('tools/build_native.py', 'xdb/tools/android-deps.sh', 'gradle/wrapper/gradle-wrapper.properties') }}
       - name: Build, unit tests and Android lint
         run: ./gradlew --no-daemon :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
       - name: Collect matching native sources

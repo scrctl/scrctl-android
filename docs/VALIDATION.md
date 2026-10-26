@@ -27,6 +27,16 @@ This confirms ordinary DDI preparation/check/reuse on this already prepared
 phone. It does not prove a fresh download from an empty cache, first installation,
 replacement or cancellation midway through a fresh installation.
 
+## Fresh-cache DDI test
+
+The Mac removed com.apple.MobileAsset.DDI version 27.1.5228.8 and confirmed
+both installed Cryptex and mounted-image lists were empty. Android cache/ddi was
+empty before preparation. The first attempt exposed an OpenSSL CA-store mismatch.
+After the App integration supplied Android system trust roots explicitly, the
+pinned SDK downloaded the DDI assets (about 16 MiB) with HTTPS verification enabled.
+Installation then failed while waiting for its final device reply. A successful
+fresh install and subsequent mirroring are not yet claimed; follow-up is pending.
+
 ## Remaining acceptance boundaries
 
 - Fresh-cache DDI download/install and cancellation on a suitable device.
