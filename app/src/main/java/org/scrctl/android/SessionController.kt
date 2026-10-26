@@ -40,17 +40,23 @@ class SessionController(private val files: File, private val cache: File,
 
     private fun valid(g: Long) = foreground.get() && g == epoch.get()
     private fun emit(g: Long, state: UiState) { main.post { if (valid(g)) update(state) } }
-    private fun events(g: Long) = NativeEvents { raw ->
+    private fun events(g: Long): NativeEvents {
+        var pin: String? = null
+        return NativeEvents { raw ->
         if (valid(g) && !cancelled.get()) runCatching {
             val event = JSONObject(raw)
             val data = event.optJSONObject("data") ?: JSONObject()
-            if (event.optString("event") == "pin") emit(g, UiState("Enter this code on the iPhone", true, pin = data.getString("pin")))
+            if (event.optString("event") == "pin") {
+                pin = data.getString("pin")
+                emit(g, UiState("Enter this code on the iPhone", true, pin = pin))
+            }
             else {
                 val total = data.optLong("total")
                 val progress = if (total > 0) "${data.optString("file")} ${data.optLong("bytes") * 100 / total}%" else data.optString("message", "Preparing…")
-                emit(g, UiState(progress, true))
+                emit(g, UiState(progress, true, pin = pin))
             }
         }
+    }
     }
     private fun connect(r: Long, g: Long): Long {
         val c = NativeBridge.connect(r, events(g))

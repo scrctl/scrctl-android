@@ -9,35 +9,39 @@ import android.net.wifi.WifiManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.Gravity
 import android.view.View
-import android.widget.ArrayAdapter
+import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.PopupMenu
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.activity.addCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
 import com.google.android.material.progressindicator.LinearProgressIndicator
-import com.google.android.material.textfield.MaterialAutoCompleteTextView
-import com.google.android.material.textfield.TextInputLayout
 
 class MainActivity : AppCompatActivity() {
     private lateinit var controller: SessionController
+    private lateinit var root: FrameLayout
+    private lateinit var listPage: LinearLayout
+    private lateinit var mirrorPage: FrameLayout
+    private lateinit var deviceList: LinearLayout
     private lateinit var mirror: MirrorView
     private lateinit var status: TextView
     private lateinit var pin: TextView
     private lateinit var progress: LinearProgressIndicator
-    private lateinit var dropdown: MaterialAutoCompleteTextView
     private lateinit var pair: MaterialButton
     private lateinit var refresh: MaterialButton
     private lateinit var prepare: MaterialButton
     private lateinit var connect: MaterialButton
     private lateinit var cancel: MaterialButton
-    private lateinit var disconnect: MaterialButton
-    private val deviceButtons = mutableListOf<MaterialButton>()
     private var devices = emptyList<Device>()
     private var selected = ""
     private var state = UiState("Starting…", true)
@@ -57,105 +61,127 @@ class MainActivity : AppCompatActivity() {
     private val networks = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) = changed()
         override fun onLost(network: Network) = changed()
-        override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) = changed()
+        override fun onLinkPropertiesChanged(network: Network, properties: LinkProperties) = changed()
         private fun changed() { main.removeCallbacks(networkUpdate); main.postDelayed(networkUpdate, 400) }
     }
-    private fun dp(n: Int) = (resources.displayMetrics.density * n).toInt()
-    private fun row(parent: LinearLayout): LinearLayout = LinearLayout(this).apply {
+    private fun dp(value: Int) = (resources.displayMetrics.density * value).toInt()
+    private fun row(parent: LinearLayout) = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         parent.addView(this, LinearLayout.LayoutParams(-1, -2))
     }
-    private fun button(parent: LinearLayout, text: String, action: () -> Unit): MaterialButton = MaterialButton(this).apply {
-        this.text = text; isAllCaps = false
-        setOnClickListener { action() }
-        parent.addView(this, LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(dp(2), 0, dp(2), 0) })
+    private fun button(parent: LinearLayout, label: String, action: () -> Unit) = MaterialButton(this).apply {
+        text = label; isAllCaps = false; setOnClickListener { action() }
+        parent.addView(this, LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(dp(3), 0, dp(3), 0) })
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+        root = FrameLayout(this)
+        listPage = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        root.addView(listPage, FrameLayout.LayoutParams(-1, -1))
+        ViewCompat.setOnApplyWindowInsetsListener(listPage) { view, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
             view.setPadding(bars.left, bars.top, bars.right, bars.bottom); insets
         }
-        root.addView(MaterialToolbar(this).apply { title = "scrctl"; subtitle = "iPhone over Wi-Fi" })
+        listPage.addView(MaterialToolbar(this).apply { title = "scrctl"; subtitle = "Connect to an iPhone over Wi-Fi" })
         val scroll = ScrollView(this)
-        val controls = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), 0, dp(16), dp(8)) }
-        scroll.addView(controls)
-        root.addView(scroll, LinearLayout.LayoutParams(-1, dp(280)))
-        val selector = TextInputLayout(this, null, com.google.android.material.R.attr.textInputOutlinedExposedDropdownMenuStyle).apply { hint = "iPhone" }
-        dropdown = MaterialAutoCompleteTextView(selector.context).apply { inputType = 0 }
-        selector.addView(dropdown, LinearLayout.LayoutParams(-1, -2)); controls.addView(selector)
-        dropdown.setOnItemClickListener { _, _, position, _ -> selected = devices[position].udid; render(state) }
-        val first = row(controls)
-        refresh = button(first, "Refresh") { mirror.clear(); controller.refresh() }
-        pair = button(first, "Wi-Fi pair") { controller.pair() }
-        val second = row(controls)
-        prepare = button(second, "Prepare DDI") { controller.prepare(selected) }
-        connect = button(second, "Mirror") { controller.mirror(selected) }
-        disconnect = button(second, "Disconnect") { mirror.clear(); controller.disconnect() }
-        status = TextView(this).apply { textSize = 14f; setPadding(0, dp(6), 0, dp(6)); accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE }
-        controls.addView(status)
-        pin = TextView(this).apply { textSize = 30f; typeface = Typeface.MONOSPACE; textAlignment = View.TEXT_ALIGNMENT_CENTER }
-        controls.addView(pin)
+        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(8), dp(16), dp(16)) }
+        scroll.addView(content)
+        listPage.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        val top = row(content)
+        refresh = button(top, "Refresh") { mirror.clear(); controller.refresh() }
+        pair = button(top, "Wi-Fi pair") { controller.pair() }
+        status = TextView(this).apply { textSize = 16f; setPadding(0, dp(16), 0, dp(12)); accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE }
+        content.addView(status)
+        pin = TextView(this).apply { textSize = 36f; typeface = Typeface.MONOSPACE; textAlignment = View.TEXT_ALIGNMENT_CENTER }
+        content.addView(pin)
         progress = LinearProgressIndicator(this).apply { isIndeterminate = true }
-        controls.addView(progress, LinearLayout.LayoutParams(-1, dp(4)))
-        cancel = button(row(controls), "Cancel") { controller.cancel() }
+        content.addView(progress, LinearLayout.LayoutParams(-1, dp(4)))
+        cancel = button(row(content), "Cancel") { controller.cancel() }
+        deviceList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        content.addView(deviceList)
+        val actions = row(content)
+        prepare = button(actions, "Prepare DDI") { controller.prepare(selected) }
+        connect = button(actions, "Connect") { controller.mirror(selected) }
+        mirrorPage = FrameLayout(this).apply { visibility = View.GONE }
         mirror = MirrorView(this)
-        root.addView(mirror, LinearLayout.LayoutParams(-1, 0, 1f))
-        val buttons = row(root)
-        listOf("Home" to 0x40, "Vol −" to 0xEA, "Vol +" to 0xE9, "Lock" to 0x30).forEach { (label, usage) ->
-            deviceButtons += button(buttons, label) { controller.button(usage) }
+        mirrorPage.addView(mirror, FrameLayout.LayoutParams(-1, -1))
+        val back = MaterialButton(this).apply { text = "‹"; contentDescription = "Back to devices"; setOnClickListener { disconnect() } }
+        mirrorPage.addView(back, FrameLayout.LayoutParams(dp(56), dp(48), Gravity.TOP or Gravity.START).apply { setMargins(dp(12), dp(12), dp(12), 0) })
+        val menu = MaterialButton(this).apply { text = "⋮"; contentDescription = "iPhone controls" }
+        menu.setOnClickListener {
+            PopupMenu(this, menu).apply {
+                listOf("Home", "Volume down", "Volume up", "Lock", "Disconnect").forEachIndexed { index, label -> this.menu.add(0, index, index, label) }
+                setOnMenuItemClickListener { item ->
+                    when (item.itemId) { 0 -> controller.button(0x40); 1 -> controller.button(0xEA); 2 -> controller.button(0xE9); 3 -> controller.button(0x30); 4 -> disconnect() }
+                    true
+                }
+            }.show()
         }
+        mirrorPage.addView(menu, FrameLayout.LayoutParams(dp(56), dp(48), Gravity.TOP or Gravity.END).apply { setMargins(dp(12), dp(12), dp(12), 0) })
+        root.addView(mirrorPage, FrameLayout.LayoutParams(-1, -1))
         controller = SessionController(filesDir, cacheDir, { render(it) }, { mirror.submit(it) })
-        mirror.acceptsFrame = controller::acceptsFrame
-        mirror.onTouch = controller::touch
-        setContentView(root)
-        render(state)
+        mirror.acceptsFrame = controller::acceptsFrame; mirror.onTouch = controller::touch
+        onBackPressedDispatcher.addCallback(this) { if (state.mirroring) disconnect() else finish() }
+        setContentView(root); render(state)
+    }
+    private fun showMirror(show: Boolean) {
+        listPage.visibility = if (show) View.GONE else View.VISIBLE
+        mirrorPage.visibility = if (show) View.VISIBLE else View.GONE
+        mirror.keepScreenOn = show
+        WindowInsetsControllerCompat(window, root).apply {
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            if (show) hide(WindowInsetsCompat.Type.systemBars()) else show(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+    private fun disconnect() { mirror.clear(); showMirror(false); controller.disconnect() }
+    private fun renderDevices() {
+        deviceList.removeAllViews()
+        devices.forEach { device ->
+            val card = MaterialCardView(this).apply {
+                isCheckable = true; isChecked = device.udid.isNotEmpty() && device.udid == selected
+                strokeWidth = if (isChecked) dp(2) else 0
+                setContentPadding(dp(16), dp(14), dp(16), dp(14))
+            }
+            val pairing = if (device.pairing == "record_present") "Paired" else "Not paired"
+            val connection = if (device.connection == "connected") "Connected" else "Not connected"
+            card.addView(TextView(this).apply {
+                textSize = 16f
+                text = "${device.name.ifEmpty { "iPhone" }}\n$pairing · $connection\n${device.udid.ifEmpty { "Start Wi-Fi pairing to identify this device" }}"
+            })
+            card.isEnabled = !state.busy
+            card.setOnClickListener { if (!state.busy) { selected = device.udid; render(state) } }
+            deviceList.addView(card, LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, dp(8), 0, dp(8)) })
+        }
     }
     private fun render(next: UiState) {
         if (isDestroyed) return
+        val changed = state.mirroring != next.mirroring
         state = next
-        next.devices?.let { found ->
-            devices = found
-            if (devices.none { it.udid == selected }) selected = devices.firstOrNull { it.udid.isNotEmpty() }?.udid.orEmpty()
-            val labels = devices.map { "${it.name.ifEmpty { it.udid.ifEmpty { "Unpaired iPhone" } }} • ${it.pairing} • ${it.connection}" }
-            dropdown.setAdapter(ArrayAdapter(this, android.R.layout.simple_list_item_1, labels))
-            val index = devices.indexOfFirst { it.udid == selected }
-            dropdown.setText(labels.getOrNull(index).orEmpty(), false)
-        }
+        next.devices?.let { devices = it; if (devices.none { d -> d.udid == selected }) selected = "" }
         status.text = next.message
         pin.text = next.pin.orEmpty(); pin.visibility = if (next.pin == null) View.GONE else View.VISIBLE
         progress.visibility = if (next.busy) View.VISIBLE else View.GONE
         cancel.visibility = if (next.busy) View.VISIBLE else View.GONE
-        refresh.isEnabled = !next.busy && !next.mirroring
-        pair.isEnabled = !next.busy && !next.mirroring
-        prepare.isEnabled = !next.busy && !next.mirroring && selected.isNotEmpty()
-        connect.isEnabled = !next.busy && !next.mirroring && selected.isNotEmpty()
-        disconnect.visibility = if (next.mirroring) View.VISIBLE else View.GONE
-        connect.visibility = if (next.mirroring) View.GONE else View.VISIBLE
-        dropdown.isEnabled = !next.busy && !next.mirroring
-        deviceButtons.forEach { it.isEnabled = next.mirroring }
+        refresh.isEnabled = !next.busy; pair.isEnabled = !next.busy
+        prepare.isEnabled = !next.busy && selected.isNotEmpty()
+        connect.isEnabled = !next.busy && selected.isNotEmpty()
+        renderDevices()
+        if (changed || !next.mirroring) showMirror(next.mirroring)
     }
     override fun onStart() {
         super.onStart(); started = true
         val wifi = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
         multicast = wifi.createMulticastLock("scrctl-mdns").apply { setReferenceCounted(false); acquire() }
-        networkKey = ""
-        connectivity.registerDefaultNetworkCallback(networks)
-        controller.resume()
+        networkKey = ""; connectivity.registerDefaultNetworkCallback(networks); controller.resume()
     }
     override fun onStop() {
-        started = false; main.removeCallbacks(networkUpdate)
-        connectivity.unregisterNetworkCallback(networks)
-        mirror.clear(); controller.pause()
+        started = false; main.removeCallbacks(networkUpdate); connectivity.unregisterNetworkCallback(networks)
+        mirror.clear(); controller.pause(); showMirror(false)
         multicast?.let { if (it.isHeld) it.release() }; multicast = null
         pin.text = ""; pin.visibility = View.GONE
         super.onStop()
     }
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        if (!hasFocus && ::mirror.isInitialized) mirror.releaseTouch()
-    }
+    override fun onWindowFocusChanged(hasFocus: Boolean) { super.onWindowFocusChanged(hasFocus); if (!hasFocus && ::mirror.isInitialized) mirror.releaseTouch() }
     override fun onDestroy() { controller.close(); super.onDestroy() }
 }

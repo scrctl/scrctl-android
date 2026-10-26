@@ -68,6 +68,7 @@ class MirrorView(context: Context) : View(context) {
         }
         return true
     }
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) { releaseTouch(); super.onSizeChanged(w, h, oldw, oldh) }
     override fun performClick(): Boolean { super.performClick(); return true }
     override fun onDetachedFromWindow() { releaseTouch(); super.onDetachedFromWindow() }
 }
