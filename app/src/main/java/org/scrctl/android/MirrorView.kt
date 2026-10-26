@@ -63,6 +63,7 @@ class MirrorView(context: Context) : View(context) {
                 val p = g.toPanel(event.x, event.y, width, height, true) ?: return true
                 contact = p; onTouch(p, true, true)
             }
+            MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_POINTER_UP -> releaseTouch()
             MotionEvent.ACTION_UP -> { releaseTouch(); performClick() }
             MotionEvent.ACTION_CANCEL -> releaseTouch()
         }
