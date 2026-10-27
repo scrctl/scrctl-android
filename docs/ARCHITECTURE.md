@@ -1,7 +1,7 @@
 # Android integration
 
-XDB is pinned to v1.1.0, commit
-efdae3b4cbaff5995538e4fe3c470c4e0ebe2064.
+XDB is pinned to a 1.2.0 development snapshot, commit
+9d607ee5e7ed97fbc4b4ab21ddaabfc054b90e7c.
 The build script rejects another commit or tracked SDK modifications. The App
 never runs an external xdb executable, changes XDB_PORT, reads pairing records,
 or implements discovery independently of the pinned SDK.
@@ -33,10 +33,12 @@ or implements discovery independently of the pinned SDK.
 The UI has a device list and an immersive mirror screen. Back disconnects and
 returns to the list. Home/volume/side-button actions live in the mirror menu.
 
-## Deferred SDK changes
+## Pairing display brand
 
-v1.1.0 exposes no host-branding option. Preserve `xdb - <Android model>` and Apple's
-DNS-SD types. Do not patch SDK strings to present a different brand.
+The pairing RPC supplies `display_brand: "scrctl"` to the embedded Server. It uses
+`scrctl - <Android model>` consistently in discovery advertisements and pairing
+information. Existing records and signed identities are unchanged. Apple DNS-SD
+types and the `XDB-...` display serial are retained; no SDK string patch is used.
 
 ## Native discovery lifecycle
 

@@ -75,7 +75,7 @@ class SessionController(private val context: Context, private val files: File, p
         return Pair(envelope.optJSONObject("result") ?: JSONObject(), reply)
     }
     fun acceptsFrame(g: Long) = valid(g) && running
-    fun resume() { foreground.set(true); restart("Starting local XDB 1.1.0…") }
+    fun resume() { foreground.set(true); restart("Starting local XDB…") }
     fun networkChanged(available: Boolean) {
         if (!foreground.get()) return
         if (available) restart("Network changed; reconnecting…") else suspendSession("No network. Waiting for connectivity.")
@@ -153,7 +153,7 @@ class SessionController(private val context: Context, private val files: File, p
         else operation("Discovering iPhones…") { r, g, _ -> discover(r, g) }
     }
     fun pair() = operation("Waiting for iPhone pairing…") { r, g, c ->
-        rpc(r, c, "pair", JSONObject().put("transport", "wifi").put("timeout_ms", 120000))
+        rpc(r, c, "pair", JSONObject().put("transport", "wifi").put("display_brand", "scrctl").put("timeout_ms", 120000))
         if (cancelled.get()) throw InterruptedException()
         discover(r, g)
     }

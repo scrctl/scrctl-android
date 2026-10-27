@@ -201,3 +201,21 @@ or removal was performed. The Android keyguard covered the Activity during the
 separate UI check, so this run does not claim a fresh visible GUI mirror result.
 The App was stopped after validation. Physical network switching, other devices
 and other Android versions remain outside this acceptance.
+
+## Pairing display brand (2026-10-28)
+
+- Pinned XDeviceBridge 1.2.0 development commit
+  `9d607ee5e7ed97fbc4b4ab21ddaabfc054b90e7c`. The App sends
+  `display_brand: "scrctl"` in its normal Wi-Fi pairing request. No SDK string
+  patch, identity change or credential migration is used.
+- Debug APK and test APK builds, existing JVM tests and lint passed. On the
+  Xiaomi 13 Ultra/API 36, the existing embedded-server test passed with version
+  1.2.0 and `pairing_display_brand:true`. The JNI runtime guard now compares the
+  loaded client against its compiled SDK header, avoiding a stale version constant.
+- Both APKs were installed with `adb install -r`. The App's actual pairing
+  progress showed `scrctl - Xiaomi 13 Ultra`. macOS system DNS-SD observed the same
+  `name` and `model` TXT values in `_remotepairing-pairable-host._tcp`.
+- Pairing wait was cancelled after inspecting the advertisement. A fingerprint
+  of the existing App-private xdb files matched before installation and after
+  cancellation. No new iPhone pairing, DDI operation or media session was run;
+  this does not establish a new complete pairing acceptance on the iPhone.
