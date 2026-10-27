@@ -19,6 +19,8 @@ automated tests and real-device acceptance are recorded separately in
 - Software-decoded video with aspect ratio, rotation and mapped single touch.
 - Home, volume and side-button controls.
 - Foreground-only sessions; network changes and backgrounding cancel native work.
+  Returning to the foreground or restoring the network discovers devices again;
+  press Connect explicitly to start another mirror session.
 
 v1.1.0 has no public branding configuration. Pairing retains its existing
 `xdb - <Android model>` display name and Apple DNS-SD service types.

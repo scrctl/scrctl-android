@@ -78,7 +78,8 @@ class SessionController(private val context: Context, private val files: File, p
     fun resume() { foreground.set(true); restart("Starting local XDB 1.1.0…") }
     fun networkChanged(available: Boolean) {
         if (!foreground.get()) return
-        if (available) restart("Network changed; reconnecting…") else suspendSession("No network. Waiting for connectivity.")
+        wantMirror = false
+        if (available) restart("Network changed; discovering iPhones…") else suspendSession("No network. Waiting for connectivity.")
     }
     private fun interrupt() { runtime.get().takeIf { it != 0L }?.let { NativeBridge.interruptAll(it) } }
     private fun stopCurrent() {
@@ -112,7 +113,7 @@ class SessionController(private val context: Context, private val files: File, p
         val g = epoch.incrementAndGet(); interrupt(); emit(g, UiState(message))
         operations.execute { stopCurrent() }
     }
-    fun pause() { foreground.set(false); epoch.incrementAndGet(); interrupt(); operations.execute { stopCurrent() } }
+    fun pause() { foreground.set(false); wantMirror = false; epoch.incrementAndGet(); interrupt(); operations.execute { stopCurrent() } }
     fun close() {
         pause()
         operations.execute { video.shutdown(); inputs.shutdown(); operations.shutdown() }

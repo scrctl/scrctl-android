@@ -25,7 +25,9 @@ or implements discovery independently of the pinned SDK.
   service or background decoding mode is implemented.
 - Default-network/address changes are debounced. Loss stops the session; a new
   network or return to foreground creates a new Server/client generation and
-  attempts the selected mirror once. Failures remain visible; no tight retry loop.
+  discovers devices. It does not restart a mirror automatically; Connect starts
+  another session explicitly. Transport failures remain visible until the user
+  connects again or refreshes discovery.
 - MulticastLock is held only while the Activity is started. Target SDK 36 uses
   INTERNET for LAN sockets; ACCESS_LOCAL_NETWORK is intentionally not requested
   as if target 37. Raising the target requires a separate permission migration.

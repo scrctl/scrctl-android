@@ -15,6 +15,8 @@ import java.io.File
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 @RunWith(AndroidJUnit4::class)
 class NsdDiscoveryTest {
@@ -152,5 +154,47 @@ class NsdDiscoveryTest {
                 assertTrue("repeated query must not wait for the old 30-second session expiry", elapsed < 10000)
             }
         } finally { NativeBridge.close(runtime, client); NativeBridge.stop(runtime) }
+    }
+
+    @Test fun networkAndForegroundRestoreRequireExplicitConnect() {
+        val udid = InstrumentationRegistry.getArguments().getString("xdbHardwareUdid") ?: ""
+        assumeTrue("opt-in prepared iPhone acceptance", udid.isNotEmpty() && Build.VERSION.SDK_INT >= 34)
+        val state = AtomicReference(UiState("Not started"))
+        val frames = AtomicInteger()
+        val controller = SessionController(context, context.filesDir, context.cacheDir,
+            { state.set(it) }, { image -> frames.incrementAndGet(); image.bitmap.recycle() })
+        fun discovered() {
+            waitUntil("paired phone listed without an active mirror") {
+                val current = state.get()
+                current.message == "Select an iPhone" && !current.mirroring &&
+                    current.devices?.any { it.udid == udid } == true
+            }
+        }
+        fun explicitlyConnect() {
+            val before = frames.get()
+            controller.mirror(udid)
+            waitUntil("explicit Connect receives new frames") { frames.get() >= before + 3 && state.get().mirroring }
+        }
+        fun remainsDisconnected() {
+            discovered()
+            val before = frames.get()
+            Thread.sleep(1500)
+            assertFalse(state.get().mirroring)
+            assertEquals("no automatic mirror after restoring availability", before, frames.get())
+        }
+        try {
+            controller.resume(); discovered(); explicitlyConnect()
+            controller.networkChanged(false)
+            waitUntil("network loss stops the server") { controller.serverPort() == 0 }
+            controller.networkChanged(true)
+            remainsDisconnected(); explicitlyConnect()
+            controller.pause()
+            waitUntil("background stops the server") { controller.serverPort() == 0 }
+            controller.resume()
+            remainsDisconnected(); explicitlyConnect()
+        } finally {
+            controller.close()
+            waitUntil("test releases its server") { controller.serverPort() == 0 }
+        }
     }
 }

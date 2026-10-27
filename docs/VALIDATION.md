@@ -201,3 +201,25 @@ or removal was performed. The Android keyguard covered the Activity during the
 separate UI check, so this run does not claim a fresh visible GUI mirror result.
 The App was stopped after validation. Physical network switching, other devices
 and other Android versions remain outside this acceptance.
+
+## Android Wi-Fi interruption and validation-host closure (2026-10-27)
+
+On the same Android/iPhone pair with SDK v1.1.0, the GUI displayed the iPhone's
+lock-screen image before the operator disabled Android Wi-Fi for about ten
+seconds and rejoined the original network. The mirror stopped and the device
+list displayed a tunnel-read disconnect error. Automatic mirror recovery is not
+an acceptance requirement: the intended behavior is to stay disconnected until
+the user presses Connect.
+
+The validation host now also clears mirror intent on network changes and
+backgrounding, making that policy independent of callback timing. Debug/test APK
+builds, JVM tests and lint passed; seven device instrumentation cases then passed.
+The added opt-in case starts real video, simulates network-loss/restoration and
+background/foreground transitions, checks that discovery does not resume video,
+and receives fresh frames after explicit Connect. The existing native NSD
+service-loss/lease test, paired-device streaming and repeated DDI queries also
+passed after the physical Wi-Fi cycle. The simulated transitions are not a
+second physical network-switch result. App-private SDK data remained unchanged.
+
+Android NSD discovery is accepted for this host/device pair. Further Android
+frontend features and UI refinement are outside this validation work.
