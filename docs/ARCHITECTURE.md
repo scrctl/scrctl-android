@@ -1,7 +1,7 @@
 # Android integration
 
-XDB is pinned to Android NSD main revision
-c524288cf29e1a817844315ba1eb1323fc0272da (based on v1.0.1).
+XDB is pinned to v1.1.0, commit
+efdae3b4cbaff5995538e4fe3c470c4e0ebe2064.
 The build script rejects another commit or tracked SDK modifications. The App
 never runs an external xdb executable, changes XDB_PORT, reads pairing records,
 or implements discovery independently of the pinned SDK.
@@ -35,7 +35,7 @@ returns to the list. Home/volume/side-button actions live in the mirror menu.
 
 ## Deferred SDK changes
 
-v1.0.1 exposes no host-branding option. Preserve `xdb - <Android model>` and Apple's
+v1.1.0 exposes no host-branding option. Preserve `xdb - <Android model>` and Apple's
 DNS-SD types. Do not patch SDK strings to present a different brand.
 
 ## Native discovery lifecycle

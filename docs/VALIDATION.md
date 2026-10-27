@@ -178,3 +178,26 @@ Build and Android lint passed. The DDI was left installed and mounted; these
 results cover one Android/iPhone pair, not other OS versions or physical network
 switching. Cancellation was exercised at download and GUI transfer boundaries,
 not exhaustively at every device-side commit point.
+
+## XDeviceBridge v1.1.0 update (2026-10-27)
+
+Updated the embedded SDK to the published v1.1.0 commit
+`efdae3b4cbaff5995538e4fe3c470c4e0ebe2064`, including the exact-version checks,
+startup text and native build manifest. Debug APK/test APK builds, JVM unit tests
+and Android lint passed. The native manifest reports 1.1.0 and hashes all seven
+packaged shared libraries.
+
+Both APKs were installed with `adb install -r` on the same Xiaomi 13 Ultra/API 36.
+All six `EmbeddedSdkTest` and `NsdDiscoveryTest` instrumentation cases passed:
+independent server ports and exact version, interrupt/close races, simulated
+foreground/network lifecycle, native NSD registration/loss and lease ownership,
+paired-iPhone discovery with three advancing decoded frames, and three successful
+DDI status queries within each test's ten-second limit. The phone remained
+iPhone14,4 / iOS 27.0.1 with its existing prepared DDI.
+
+Persistent SDK data hashes matched before installation and after testing. No
+App data was cleared, no credentials were imported/replaced, and no DDI download
+or removal was performed. The Android keyguard covered the Activity during the
+separate UI check, so this run does not claim a fresh visible GUI mirror result.
+The App was stopped after validation. Physical network switching, other devices
+and other Android versions remain outside this acceptance.

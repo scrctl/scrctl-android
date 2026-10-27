@@ -75,7 +75,7 @@ class SessionController(private val context: Context, private val files: File, p
         return Pair(envelope.optJSONObject("result") ?: JSONObject(), reply)
     }
     fun acceptsFrame(g: Long) = valid(g) && running
-    fun resume() { foreground.set(true); restart("Starting local XDB 1.0.1…") }
+    fun resume() { foreground.set(true); restart("Starting local XDB 1.1.0…") }
     fun networkChanged(available: Boolean) {
         if (!foreground.get()) return
         if (available) restart("Network changed; reconnecting…") else suspendSession("No network. Waiting for connectivity.")
