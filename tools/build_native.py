@@ -9,7 +9,7 @@ import shutil
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
-PIN = '9d607ee5e7ed97fbc4b4ab21ddaabfc054b90e7c'
+PIN = 'fca2f4823418b46b636dff962078f2f30948f41d'
 def run(*args):
     subprocess.run([str(a) for a in args], cwd=ROOT, check=True)
 def main():
@@ -54,7 +54,7 @@ def main():
         for source in (ROOT/'.native/build/_deps'/f'{component}-src').glob('*'):
             if source.name.startswith(('LICENSE','COPYING','NOTICE')): notice(source,Path(component)/source.name)
     notice(ndk/'NOTICE.toolchain',Path('NDK/NOTICE.toolchain'))
-    metadata={'sdk_version':'1.2.0','sdk_commit':PIN,'ndk':'29.0.14206865',
+    metadata={'sdk_version':'1.3.0','sdk_commit':PIN,'ndk':'29.0.14206865',
               'libraries':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in target.glob('*.so')}}
     (assets/'native-build.json').write_text(json.dumps(metadata,indent=2)+'\n')
 if __name__=='__main__': main()

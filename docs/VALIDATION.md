@@ -219,3 +219,17 @@ and other Android versions remain outside this acceptance.
   of the existing App-private xdb files matched before installation and after
   cancellation. No new iPhone pairing, DDI operation or media session was run;
   this does not establish a new complete pairing acceptance on the iPhone.
+
+## XDeviceBridge v1.3.0 update (2026-10-28)
+
+- Updated the embedded client and Server to release commit
+  `fca2f4823418b46b636dff962078f2f30948f41d`. This includes the RPC reply-wakeup
+  fix; the App still uses its existing session access and pairing-brand behavior.
+- Debug APK/test APK builds, JVM unit tests and Android lint passed. Both APKs
+  were installed over the existing App with `adb install -r` on the Xiaomi 13
+  Ultra/API 36. All three `EmbeddedSdkTest` instrumentation cases passed, including
+  the exact 1.3.0 Server version and independent embedded runtimes.
+- The existing pairing-record digest matched before and after installation and
+  testing. No App data was cleared or DDI operation performed. The App process
+  started, but Android pocket mode covered the Activity during the UI check.
+  User-visible mirror performance remains a separate manual acceptance.

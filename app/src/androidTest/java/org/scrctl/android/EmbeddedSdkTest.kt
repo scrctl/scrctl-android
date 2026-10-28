@@ -31,7 +31,7 @@ class EmbeddedSdkTest {
                 try {
                     val reply=JSONObject(NativeBridge.request(r,c,"server.info","{}").json)
                     assertTrue(reply.getBoolean("ok"))
-                    assertEquals("1.2.0",reply.getJSONObject("result").getString("version"))
+                    assertEquals("1.3.0",reply.getJSONObject("result").getString("version"))
                     assertTrue(reply.getJSONObject("result").getJSONObject("capabilities").getBoolean("pairing_display_brand"))
                     val invalid=JSONObject(NativeBridge.request(r,c,"devices","{\"timeout_ms\":-1}").json)
                     assertFalse(invalid.getBoolean("ok"))
