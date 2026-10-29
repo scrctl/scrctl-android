@@ -1,251 +1,109 @@
-# Initial Android validation
+# Android validation status
 
-SDK: XDeviceBridge v1.0.1, commit `6248da9f5a6ccdca345f45858f4a0c3fe8ef5a76`.
-App ABI: arm64-v8a. These results cover a development/debug APK, not a released
+Current SDK pin: **XDeviceBridge 1.4.0**, commit
+`2ac3ae68335280aa80c1ab084a46e19da029fa10`.
+App ABI: arm64-v8a. This App primarily validates embedding XDeviceBridge in an
+Android application. Results below cover development/debug APKs, not a release
 or store-distributed build.
+
+This document summarizes completed acceptance and remaining boundaries, rather
+than intermediate debugging attempts. Hardware results retain their tested SDK
+revision: they are not a claim that every scenario was rerun on the current pin.
 
 ## Build and automated checks
 
-- macOS / JDK 17 / Android SDK 36 / NDK 29.0.14206865: debug APK, test APK,
-  JVM tests and Android lint build successfully.
-- Five JVM geometry tests pass: aspect/padding, rotations, inverse touch mapping,
-  invalid geometry, and dragging outside the visible content.
-- Three instrumentation tests pass on a Xiaomi 13 Ultra (Android API 36,
-  4 KiB pages): independent embedded Server ports and SDK version; request
-  interruption/cleanup; repeated foreground/background and network-state cleanup.
-- The network-state test invokes controller transitions; it does not constitute
-  physical Wi-Fi switching acceptance. No emulator acceptance is claimed.
+- JDK 17, Android SDK 36 and NDK 29.0.14206865 build the debug APK and test APK.
+  JVM geometry tests and Android lint have passed locally.
+- The five geometry tests cover aspect/padding, rotations, inverse touch mapping,
+  invalid geometry and dragging outside the visible content.
+- [CI for App commit b0da699](https://github.com/scrctl/scrctl-android/actions/runs/40878990336)
+  passed with the current SDK pin. It builds the debug APK, runs JVM tests and
+  lint, and packages matching sources. It does not run iPhone hardware acceptance.
+- On-device instrumentation covers independent embedded Server ports, SDK version,
+  request interruption/close races and simulated foreground/network transitions.
+  These are physical Android instrumentation tests, not emulator results or proof
+  of physical Wi-Fi switching.
 
-## User-confirmed real-device acceptance
+## Real-device acceptance
 
-Using the installed Android App and an iPhone over Wi-Fi, the user completed
-pairing, connection and video mirroring, and reported working touch input.
-The user also invoked Prepare DDI and observed
-“DDI prepared. You can now mirror this iPhone.”
+Hardware coverage uses a Xiaomi 13 Ultra (Android API 36, 4 KiB pages) and
+an iPhone14,4 running iOS 27.0.1 over Wi-Fi.
 
-This confirms ordinary DDI preparation/check/reuse on this already prepared
-phone. It does not prove a fresh download from an empty cache, first installation,
-replacement or cancellation midway through a fresh installation.
+| Capability | Confirmed result | Evidence scope |
+| --- | --- | --- |
+| Pairing and mirror | The user completed Wi-Fi pairing, connection and visible mirroring, and confirmed touch input. A new App-owned pairing also passed discovery and advancing-frame checks. | Initial SDK and NSD integration, 2026-10-27 |
+| Native discovery | System-registered peers reach the SDK list; warm discovery, lost-service eviction, shared leases and final-close cleanup pass. The paired iPhone produces three advancing decoded frames. | NSD revision `f797fe3`; repeated on SDK 1.1.0 |
+| Discovery cleanup | Backgrounding releases the App UID's active NSD discovery and service-info requests, confirmed through Android system diagnostics. | NSD integration, 2026-10-27 |
+| DDI status | Three successive authenticated status queries confirm the mount, each within the test's ten-second limit. | Revision `bb07cae`; repeated on SDK 1.1.0 |
+| Fresh DDI preparation | Empty-cache download, verification, Apple ticket acquisition, installation and mount verification pass; a new session receives advancing video frames. | Revision `bb07cae`, 2026-10-27; details below |
+| Pairing brand | The real App progress and macOS DNS-SD observation both show `scrctl - Xiaomi 13 Ultra`, with the expected Apple service type and TXT values. | Revision `9d607ee`; advertisement and cancellation only, not a new completed pairing |
+| Multi-touch | Five simultaneous contacts, movement, individual release and final zero-contact state reach the iPhone. A two-finger CANCEL also returns to zero. | Revision `09a03d3`, 2026-10-29; automated actual View-to-device test |
 
-## Fresh-cache DDI test
+Native NSD is enabled on API 34+; earlier versions or unavailable native discovery
+use direct mDNS. Pairing advertisements retain the SDK implementation because the
+public Android registration API cannot set the exact SRV target. Acceptance of
+native NSD does not establish the fallback on every supported Android version.
 
-The Mac removed com.apple.MobileAsset.DDI version 27.1.5228.8 and confirmed
-both installed Cryptex and mounted-image lists were empty. Android cache/ddi was
-empty before preparation. The first attempt exposed an OpenSSL CA-store mismatch.
-After the App integration supplied Android system trust roots explicitly, the
-pinned SDK downloaded the DDI assets (about 16 MiB) with HTTPS verification enabled.
-Installation then failed while waiting for its final device reply. A successful
-fresh install and subsequent mirroring were not established by that initial run.
-The unlocked SDK and GUI acceptance below supersedes this pending result.
+### DDI download, installation and cancellation
+
+The opt-in Android `DdiLifecycleTest` used the existing App-private pairing and a
+separate empty cache. It removed the DDI and independently confirmed both
+`mounted:false` and `cryptex_installed:false` before preparation.
+
+Cancellation after nonzero download progress completed cleanup without leaving a
+staging directory or version lock; independent status still confirmed absence.
+A retry starting from an empty cache downloaded and verified all five assets,
+obtained the Apple ticket, uploaded and installed
+`com.apple.MobileAsset.DDI` version `27.1.5228.8`. Independent status confirmed
+installation and mount state, followed by three advancing decoded video frames.
+HTTPS verification remained enabled using the App's Android system trust roots.
+
+Separate actual GUI testing also started with an absent DDI and empty normal
+App cache. Prepare DDI displayed transfer progress and then
+**DDI prepared. You can now mirror this iPhone.**
+A further GUI transfer cancellation displayed
+**Cancelled. Completed device changes are not rolled back.** and re-enabled the
+controls. Retrying succeeded, and Connect visibly displayed the iPhone screen.
+That GUI retry could reuse assets downloaded before cancellation.
+
+The existing pairing-record digest stayed unchanged. These checks establish
+fresh preparation and cancellation/retry on this device pair; they do not prove
+rollback or cancellation at every signing/device-commit stage. DDI removal is
+explicitly opt-in; ordinary test runs skip it. See the
+[README test instructions](../README.md#build).
+
+### Multi-touch and SDK update coverage
+
+`MultitouchTest` launched the actual Activity, selected the paired iPhone and
+connected its mirror. It dispatched multi-pointer MotionEvents through
+MirrorView, using pointer IDs different from XDB slots. An iPhone Safari observer
+confirmed the resulting contacts. This is automated View-to-device acceptance,
+not manual five-finger interaction on the Android glass.
+
+The three embedded-runtime instrumentation cases also passed with the 1.4.0
+development revision `09a03d3`, including the final input-release TCP drain fix.
+Earlier SDK 1.1.0 checks passed all six embedded-runtime/NSD cases; SDK 1.3.0
+passed the three embedded-runtime cases. The final 1.4.0 pin has CI coverage as
+linked above; no additional full hardware rerun is claimed for that pin.
 
 ## Remaining acceptance boundaries
 
-- Other cancellation timings during signing or the final device-side commit;
-  cancellation does not promise rollback of completed installation changes.
-- Physical network loss/switch and foreground restoration during an active mirror.
-- Other Android models, 16 KiB page devices, other ABIs and long sessions.
-- Basic Home/volume/Lock controls require separate visible device confirmation.
+- Physical network loss/switch and foreground restoration during an active mirror;
+  simultaneous Ethernet/Wi-Fi, IPv6 scope and multiple-interface behavior.
+- Visible device confirmation of the Android UI's Home, volume and Lock controls.
+- Cancellation during signing or the final device-side commit. Cancellation does
+  not promise rollback of completed installation changes.
+- Other Android/iPhone models and OS versions, 16 KiB page devices, other ABIs and
+  long sessions.
+- Release signing, distribution and installation of a release APK are outside
+  this debug-App acceptance.
 
-CI builds APKs, runs JVM tests and lint, and collects corresponding sources.
-It cannot replace real iPhone pairing, visual/input or DDI installation acceptance.
+## Preserve device state when testing
 
-## NSD SDK integration (2026-10-27)
-
-SDK revision: `f797fe3` (development snapshot based on v1.0.1). Debug APK,
-Android-test APK, five JVM geometry tests and Android lint pass with JDK 17,
-SDK 36 and NDK 29. The APK was installed over the existing App on the same Xiaomi
-13 Ultra/API 36. The direct instrumentation runs used the existing App record.
-
-All five instrumentation tests pass with hardware acceptance enabled. In addition
-to the three initial tests, these cover a system-registered test peer reaching the
-native SDK device list, warm discovery in under two seconds, lost-service eviction,
-shared NSD leases and final-close cleanup. An opt-in test identifies the existing
-paired iPhone14,4 / iOS 27.0.1 using NSD, opens a Wi-Fi session and receives three
-advancing decoded frames before stopping video and closing normally.
-
-The foreground App UI also discovered the paired iPhone and displayed its visible
-lock screen in the fullscreen mirror. Backgrounding released the App UID's active
-NSD discovery and service-info requests, verified through Android system diagnostics.
-No pairing or DDI changes were needed in this round. A manual Refresh now reuses
-the server/subscription instead of restarting both.
-
-Native NSD is enabled on API 34+; lower releases retain the SDK's direct backend.
-The pairing advertiser is unchanged because public Android registration cannot set
-the exact SRV target. Physical network switching and simultaneous Ethernet/Wi-Fi
-remain unverified; the automated network test exercises controller transitions.
-
-
-### Device-test cleanup incident
-
-A subsequent `connectedDebugAndroidTest` run passed all five tests, but the
-Android Gradle plugin then uninstalled both target and test APKs by default,
-removing the App's private data. The App was reinstalled. The original Android
-record had no local backup; an existing Mac xdb record was copied directly into
-App-private storage under the user's prior authorization to use it for Android
-debugging. Its contents were not logged. The hardware test was rerun through
-`adb shell am instrument`, which does not uninstall the App afterward.
-
-`android.injected.androidTest.leaveApksInstalledAfterRun=true` is now set for the
-pinned Android Gradle plugin. Prefer explicit `adb install -r` and `am instrument`
-for a previously paired host; do not use clean/uninstall operations against its
-private data. The NSD feature itself does not import or migrate credentials.
-
-The user then completed a new Wi-Fi pairing through the App. The resulting
-App-private record was checked to differ from the temporary Mac record, and the
-App's list identified the newly paired iPhone using the active NSD subscription.
-All five direct instrumentation tests passed again with this fresh Android
-record (5.65 seconds), including the Wi-Fi connection and advancing video frames.
-The temporary recovery copy was deleted. The installed APK's SHA-256 matched the
-final local artifact, and direct instrumentation left the App/data installed.
-
-## DDI session cleanup integration (2026-10-27)
-
-SDK revision: `bb07cae8364f218cbb2ae3498fae133f8e06d4f5` (based on v1.0.1).
-Debug and test APKs build, the five JVM geometry tests pass (unchanged test inputs
-were reused by Gradle), and Android lint passes. This build used Homebrew OpenJDK
-17; the installed GraalVM 17 failed at Android's JDK-image transform.
-
-Both APKs were installed with `adb install -r` on the same Xiaomi 13 Ultra/API 36.
-All six direct instrumentation tests passed, with no skips (10.086 seconds).
-The new opt-in hardware test performed three successive `ddi.status` requests
-through native NSD discovery and the App-owned pairing record. Each confirmed the
-existing mount; measured times inside Android were 1.203, 1.258 and 1.414 seconds.
-No query waited for the previous image-mounter session's 30-second expiry.
-Existing tests also confirmed discovery lifecycle, cancellation and three
-advancing decoded iPhone frames through an authenticated Wi-Fi connection.
-
-The credential digest was identical before and after installation/tests, and the
-installed APK hash matched the local artifact. The App was left installed and
-relaunched after testing. No credentials were imported, replaced or saved outside
-App storage; only a digest was retained for comparison. No DDI download, removal
-or fresh installation was performed. This closes the
-Android repeated-query acceptance for this device, not the fresh-install or
-physical network-switch boundaries above.
-
-## Fresh Android DDI installation and GUI recovery (2026-10-27)
-
-SDK revision `bb07cae`, debug App on Xiaomi 13 Ultra/API 36, using the existing
-App-private pairing with iPhone14,4 / iOS 27.0.1. No production App/SDK behavior
-was changed for these checks. The new `DdiLifecycleTest` requires both an explicit
-device identifier and `xdbDdiLifecycle=true`; ordinary test runs skip removal.
-Its separate `xdbDdiInspect=true` case only queries state after an uncertain
-installation, without retrying or changing it.
-
-### SDK lifecycle test in the Android application sandbox
-
-- Removed the existing DDI through the embedded SDK. Independent status confirmed
-  both `mounted:false` and `cryptex_installed:false` before preparation.
-- Created a unique, empty test cache. Interrupted the request after nonzero
-  progress on the image download; the request failed rather than claiming success.
-  Server shutdown joined cancellation cleanup. No staging directory or version
-  lock remained, and independent status still confirmed absence.
-- An initial attempt reached upload completion but timed out waiting for the
-  final installation reply (120-second install budget). A read-only inspection
-  confirmed the DDI was still absent; the test did not blindly replace an
-  uncertain installation. The user then confirmed the iPhone was unlocked and
-  would remain lit.
-- The full lifecycle was rerun with another empty cache. Download cancellation
-  and cleanup took 119 ms; retry still started empty, downloaded and verified the
-  five assets, obtained the Apple ticket, uploaded, installed and verified
-  `com.apple.MobileAsset.DDI` version `27.1.5228.8` in 17.285 seconds.
-- Independent status confirmed installation and mount state. A new authenticated
-  Wi-Fi session received three advancing decoded frames. The opt-in test passed
-  in 30.198 seconds. This timing covers this run; it is not a general download or
-  installation performance guarantee, nor proof that every timeout is lock-related.
-
-### Real Android GUI
-
-- With the App stopped, the Mac CLI removed the DDI and independently confirmed
-  absence. The App's normal `cache/ddi` directory did not yet exist. Using only
-  actual UI taps, selected the paired iPhone and pressed **Prepare DDI**. The
-  screen displayed transfer progress and then **DDI prepared. You can now mirror
-  this iPhone.** This was a fresh GUI download/install, not mounted-image reuse.
-- For the GUI cancellation check, removed the DDI again while the App was stopped
-  and moved that newly downloaded cache aside. Started **Prepare DDI** from the
-  empty normal cache and tapped **Cancel** while transfer progress and the busy
-  indicator were visible. The screen showed **Cancelled. Completed device
-  changes are not rolled back.** and re-enabled Prepare/Connect.
-- Pressed **Prepare DDI** again. The GUI reached the success message after about
-  ten seconds of observation; that retry could reuse assets downloaded before
-  cancellation. Pressing **Connect** opened the actual mirror, visually showing
-  the iPhone's Developer Mode settings screen. A successfully opened mirror page
-  alone was not counted as visible-frame evidence.
-
-The original credential digest remained unchanged throughout. Only test-created
-cache directories were removed; the verified normal App cache was retained.
-Both APKs were installed with `adb install -r`, without clearing App data.
-Build and Android lint passed. The DDI was left installed and mounted; these
-results cover one Android/iPhone pair, not other OS versions or physical network
-switching. Cancellation was exercised at download and GUI transfer boundaries,
-not exhaustively at every device-side commit point.
-
-## XDeviceBridge v1.1.0 update (2026-10-27)
-
-Updated the embedded SDK to the published v1.1.0 commit
-`efdae3b4cbaff5995538e4fe3c470c4e0ebe2064`, including the exact-version checks,
-startup text and native build manifest. Debug APK/test APK builds, JVM unit tests
-and Android lint passed. The native manifest reports 1.1.0 and hashes all seven
-packaged shared libraries.
-
-Both APKs were installed with `adb install -r` on the same Xiaomi 13 Ultra/API 36.
-All six `EmbeddedSdkTest` and `NsdDiscoveryTest` instrumentation cases passed:
-independent server ports and exact version, interrupt/close races, simulated
-foreground/network lifecycle, native NSD registration/loss and lease ownership,
-paired-iPhone discovery with three advancing decoded frames, and three successful
-DDI status queries within each test's ten-second limit. The phone remained
-iPhone14,4 / iOS 27.0.1 with its existing prepared DDI.
-
-Persistent SDK data hashes matched before installation and after testing. No
-App data was cleared, no credentials were imported/replaced, and no DDI download
-or removal was performed. The Android keyguard covered the Activity during the
-separate UI check, so this run does not claim a fresh visible GUI mirror result.
-The App was stopped after validation. Physical network switching, other devices
-and other Android versions remain outside this acceptance.
-
-## Pairing display brand (2026-10-28)
-
-- Pinned XDeviceBridge 1.2.0 development commit
-  `9d607ee5e7ed97fbc4b4ab21ddaabfc054b90e7c`. The App sends
-  `display_brand: "scrctl"` in its normal Wi-Fi pairing request. No SDK string
-  patch, identity change or credential migration is used.
-- Debug APK and test APK builds, existing JVM tests and lint passed. On the
-  Xiaomi 13 Ultra/API 36, the existing embedded-server test passed with version
-  1.2.0 and `pairing_display_brand:true`. The JNI runtime guard now compares the
-  loaded client against its compiled SDK header, avoiding a stale version constant.
-- Both APKs were installed with `adb install -r`. The App's actual pairing
-  progress showed `scrctl - Xiaomi 13 Ultra`. macOS system DNS-SD observed the same
-  `name` and `model` TXT values in `_remotepairing-pairable-host._tcp`.
-- Pairing wait was cancelled after inspecting the advertisement. A fingerprint
-  of the existing App-private xdb files matched before installation and after
-  cancellation. No new iPhone pairing, DDI operation or media session was run;
-  this does not establish a new complete pairing acceptance on the iPhone.
-
-## XDeviceBridge v1.3.0 update (2026-10-28)
-
-- Updated the embedded client and Server to release commit
-  `fca2f4823418b46b636dff962078f2f30948f41d`. This includes the RPC reply-wakeup
-  fix; the App still uses its existing session access and pairing-brand behavior.
-- Debug APK/test APK builds, JVM unit tests and Android lint passed. Both APKs
-  were installed over the existing App with `adb install -r` on the Xiaomi 13
-  Ultra/API 36. All three `EmbeddedSdkTest` instrumentation cases passed, including
-  the exact 1.3.0 Server version and independent embedded runtimes.
-- The existing pairing-record digest matched before and after installation and
-  testing. No App data was cleared or DDI operation performed. The App process
-  started, but Android pocket mode covered the Activity during the UI check.
-  User-visible mirror performance remains a separate manual acceptance.
-
-## Multi-touch UI acceptance — 2026-10-29
-
-- Embedded the 1.4.0 development SDK at
-  `09a03d3350fe722d57f13857257c1eb2cc93d520`, including the final input-release
-  TCP drain fix. Installed debug and test APKs with `adb install -r` on the
-  Xiaomi 13 Ultra/API 36; the existing pairing-record SHA-256 stayed unchanged.
-- The opt-in `MultitouchTest` launched the actual Activity, selected the paired
-  iPhone, connected its mirror, and dispatched multi-pointer MotionEvents through
-  the actual MirrorView. Pointer IDs deliberately differed from XDB slots. The
-  iPhone14,4 / iOS 27.0.1 Safari observer reported five simultaneous contacts,
-  movement, individual release without changing other identities, and zero
-  contacts after the final UP. A separate two-finger CANCEL returned to zero.
-- This is automated View-to-device acceptance, not a claim of manually exercising
-  five physical fingers on the Android glass. The existing three EmbeddedSdkTest
-  cases passed against 1.4.0; no pairing reset or DDI operation was performed.
+Use `adb install -r` and direct `adb shell am instrument` for an already paired
+App. The project also sets
+`android.injected.androidTest.leaveApksInstalledAfterRun=true` for its pinned
+Android Gradle plugin. Do not clear App data or uninstall it as routine test
+cleanup. Pairing records remain SDK-owned in App-private persistent storage.
+Destructive DDI lifecycle tests require explicit opt-in; read-only status checks
+should resolve uncertain device state before retrying an installation.
