@@ -233,3 +233,19 @@ and other Android versions remain outside this acceptance.
   testing. No App data was cleared or DDI operation performed. The App process
   started, but Android pocket mode covered the Activity during the UI check.
   User-visible mirror performance remains a separate manual acceptance.
+
+## Multi-touch UI acceptance — 2026-10-29
+
+- Embedded the 1.4.0 development SDK at
+  `09a03d3350fe722d57f13857257c1eb2cc93d520`, including the final input-release
+  TCP drain fix. Installed debug and test APKs with `adb install -r` on the
+  Xiaomi 13 Ultra/API 36; the existing pairing-record SHA-256 stayed unchanged.
+- The opt-in `MultitouchTest` launched the actual Activity, selected the paired
+  iPhone, connected its mirror, and dispatched multi-pointer MotionEvents through
+  the actual MirrorView. Pointer IDs deliberately differed from XDB slots. The
+  iPhone14,4 / iOS 27.0.1 Safari observer reported five simultaneous contacts,
+  movement, individual release without changing other identities, and zero
+  contacts after the final UP. A separate two-finger CANCEL returned to zero.
+- This is automated View-to-device acceptance, not a claim of manually exercising
+  five physical fingers on the Android glass. The existing three EmbeddedSdkTest
+  cases passed against 1.4.0; no pairing reset or DDI operation was performed.

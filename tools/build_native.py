@@ -9,7 +9,7 @@ import shutil
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
-PIN = '3cff630648c32bf9fc1001b3ae6f6c26b61d606a'
+PIN = '09a03d3350fe722d57f13857257c1eb2cc93d520'
 def run(*args):
     subprocess.run([str(a) for a in args], cwd=ROOT, check=True)
 def main():
