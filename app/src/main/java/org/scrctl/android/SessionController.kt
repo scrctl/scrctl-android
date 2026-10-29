@@ -34,8 +34,8 @@ class SessionController(private val context: Context, private val files: File, p
     @Volatile private var wantMirror = false
     @Volatile var running = false; private set
     private val touchLock = Any()
-    private data class Touch(val point: Point, val down: Boolean, val move: Boolean)
-    private val touches = ArrayDeque<Touch>()
+    private data class Touch(val contact: Int, val point: Point, val down: Boolean, val move: Boolean)
+    private val touches = java.util.ArrayDeque<Touch>()
     private var inputScheduled = false
     private val buttonPending = AtomicBoolean()
 
@@ -213,13 +213,24 @@ class SessionController(private val context: Context, private val files: File, p
             }
         } finally { if (c != 0L) NativeBridge.close(r, c) }
     }
-    fun touch(point: Point, down: Boolean, move: Boolean) {
+    fun touch(contact: Int, point: Point, down: Boolean, move: Boolean) {
         if (!running) return
         val r = runtime.get(); val c = inputClient; val g = epoch.get()
         synchronized(touchLock) {
-            if (move && touches.lastOrNull()?.move == true) touches.removeLast()
-            if (touches.size >= 32) { touches.clear(); touches.add(Touch(point, false, false)) }
-            else touches.add(Touch(point, down, move))
+            // Coalesce only within the trailing move batch, never across a down/up.
+            if (move) {
+                val iterator = touches.descendingIterator()
+                while (iterator.hasNext()) {
+                    val previous = iterator.next()
+                    if (!previous.move) break
+                    if (previous.contact == contact) { iterator.remove(); break }
+                }
+            }
+            if (touches.size >= 64) {
+                failSession(g, "Input queue is full; disconnected to release held contacts")
+                return
+            }
+            touches.add(Touch(contact, point, down, move))
             if (inputScheduled) return
             inputScheduled = true
         }
@@ -230,7 +241,7 @@ class SessionController(private val context: Context, private val files: File, p
                         if (touches.isEmpty()) { inputScheduled = false; return@execute }
                         touches.removeFirst()
                     }
-                    rpc(r, c, "input.touch", JSONObject().put("x", next.point.x).put("y", next.point.y).put("down", next.down))
+                    rpc(r, c, "input.touch", JSONObject().put("contact", next.contact).put("x", next.point.x).put("y", next.point.y).put("down", next.down))
                 }
             } catch (e: Exception) { if (valid(g)) failSession(g, "Input failed: ${e.message}") }
             synchronized(touchLock) { inputScheduled = false; touches.clear() }

@@ -3,8 +3,8 @@
 A focused native Kotlin / Material 3 Android frontend for iPhone Wi-Fi mirroring
 and control, and an application-sandbox validation host for XDeviceBridge.
 
-The SDK is pinned to **XDeviceBridge 1.3.0**, commit
-`fca2f4823418b46b636dff962078f2f30948f41d`.
+The SDK is pinned to **XDeviceBridge 1.4.0 development snapshot**, commit
+`3cff630648c32bf9fc1001b3ae6f6c26b61d606a`.
 The App embeds libxdb_server and libxdb_client through JNI. It never executes an
 external xdb program. Pairing records belong to xdb in App-private persistent
 storage; the App does not parse credentials. DDI uses App cache storage.
@@ -16,7 +16,7 @@ automated tests and real-device acceptance are recorded separately in
 ## Initial scope
 
 - Wi-Fi discovery, pairing PIN/progress/cancellation and DDI preparation.
-- Software-decoded video with aspect ratio, rotation and mapped single touch.
+- Software-decoded video with aspect ratio, rotation and mapped multi-touch (up to five fingers).
 - Home, volume and side-button controls.
 - Foreground-only sessions; network changes and backgrounding cancel native work.
 

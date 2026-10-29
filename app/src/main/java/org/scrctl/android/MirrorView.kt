@@ -17,8 +17,8 @@ class MirrorView(context: Context) : View(context) {
     private val pending = AtomicReference<VideoFrame?>()
     private var displayed: VideoFrame? = null
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
-    private var contact: Point? = null
-    var onTouch: (Point, Boolean, Boolean) -> Unit = { _, _, _ -> }
+    private val contacts = TouchContacts { id, point, down, move -> onTouch(id, point, down, move) }
+    var onTouch: (Int, Point, Boolean, Boolean) -> Unit = { _, _, _, _ -> }
     init { setBackgroundColor(Color.BLACK); contentDescription = "iPhone mirror" }
     fun submit(frame: VideoFrame) {
         pending.getAndSet(frame)?.bitmap?.recycle()
@@ -30,7 +30,7 @@ class MirrorView(context: Context) : View(context) {
         displayed = null
         invalidate()
     }
-    fun releaseTouch() { contact?.let { onTouch(it, false, false) }; contact = null }
+    fun releaseTouch() { contacts.release() }
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         pending.getAndSet(null)?.let {
@@ -53,18 +53,26 @@ class MirrorView(context: Context) : View(context) {
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val g = displayed?.geometry ?: return false
         when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                val p = g.toPanel(event.x, event.y, width, height) ?: return false
-                parent.requestDisallowInterceptTouchEvent(true)
-                contact = p; onTouch(p, true, false)
+            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                if (event.actionMasked == MotionEvent.ACTION_DOWN) releaseTouch()
+                val i = event.actionIndex
+                val p = g.toPanel(event.getX(i), event.getY(i), width, height)
+                if (p != null) contacts.down(event.getPointerId(i), p)
+                if (event.actionMasked == MotionEvent.ACTION_DOWN && p == null) return false
+                parent?.requestDisallowInterceptTouchEvent(true)
             }
             MotionEvent.ACTION_MOVE -> {
-                if (contact == null) return false
-                val p = g.toPanel(event.x, event.y, width, height, true) ?: return true
-                contact = p; onTouch(p, true, true)
+                for (i in 0 until event.pointerCount) {
+                    val p = g.toPanel(event.getX(i), event.getY(i), width, height, true) ?: continue
+                    contacts.move(event.getPointerId(i), p)
+                }
             }
-            MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_POINTER_UP -> releaseTouch()
-            MotionEvent.ACTION_UP -> { releaseTouch(); performClick() }
+            MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_UP -> {
+                val i = event.actionIndex
+                val p = g.toPanel(event.getX(i), event.getY(i), width, height, true)
+                contacts.up(event.getPointerId(i), p)
+                if (event.actionMasked == MotionEvent.ACTION_UP) { releaseTouch(); performClick() }
+            }
             MotionEvent.ACTION_CANCEL -> releaseTouch()
         }
         return true
