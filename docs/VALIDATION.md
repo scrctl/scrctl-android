@@ -86,6 +86,17 @@ Earlier SDK 1.1.0 checks passed all six embedded-runtime/NSD cases; SDK 1.3.0
 passed the three embedded-runtime cases. The final 1.4.0 pin has CI coverage as
 linked above; no additional full hardware rerun is claimed for that pin.
 
+## Preview refresh without a fixed client cap
+
+The preview loop no longer sleeps to fill a fixed 50 ms interval. The debug APK
+built and was installed with `adb install -r` on the existing Xiaomi 13 Ultra;
+its saved pairing connected to the iPhone and the actual fullscreen mirror
+showed advancing content. Two sampled screen images differed within the mirrored
+content area. The phone's `dumpsys gfxinfo` counter reported zero, so no measured
+preview FPS or power improvement is claimed. This check retained the pinned
+1.4.0 SDK and software decoding; it does not validate MediaCodec or the newer
+Server's optional `max_fps` API.
+
 ## Remaining acceptance boundaries
 
 - Physical network loss/switch and foreground restoration during an active mirror;

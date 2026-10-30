@@ -203,8 +203,6 @@ class SessionController(private val context: Context, private val files: File, p
                     val geometry = Geometry(value.getInt("width"), value.getInt("height"), d.optInt("width"), d.optInt("height"), Geometry.rotation(d.optString("orientation")))
                     reply.bitmap?.let { image -> if (valid(g)) frame(VideoFrame(image, geometry, g)) else image.recycle() }
                 } catch (e: RpcFailure) { if (e.code != "no_frame" && e.code != "geometry_changed") throw e }
-                val remaining = 50 - (System.nanoTime() - started) / 1_000_000
-                if (remaining > 0) Thread.sleep(remaining)
             }
         } catch (e: Exception) {
             if (valid(g)) {
