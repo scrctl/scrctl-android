@@ -78,4 +78,8 @@ transient PIN displayed by the App. Credentials remain in App-private storage.
 
 Apache-2.0 for the App; XDeviceBridge remains LGPL-3.0-only. Native and Android
 libraries have their respective notices. Rebuild/install instructions and exact
-SDK/source pins are provided; no release APK or store publication is claimed yet.
+SDK/source pins are provided. Signed APKs and their corresponding source archives
+are available from [GitHub Releases](https://github.com/scrctl/scrctl-android/releases).
+Use the signed APK for in-place upgrades of the release build. Android requires
+the same signing certificate to keep app data during an upgrade, so replacing
+a debug build with the release APK requires a fresh installation.

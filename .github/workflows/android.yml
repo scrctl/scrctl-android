@@ -2,6 +2,7 @@ name: Android
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 permissions:
@@ -48,3 +49,67 @@ jobs:
             app/build/reports/tests/
             app/build/reports/lint-results-debug.*
           if-no-files-found: ignore
+
+      - name: Build release APK
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        run: ./gradlew --no-daemon :app:assembleRelease
+      - name: Sign and verify release APK
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          build_tools="$ANDROID_HOME/build-tools/36.0.0"
+          unsigned=app/build/outputs/apk/release/app-release-unsigned.apk
+          version=$("$build_tools/aapt2" dump badging "$unsigned" | sed -n "s/^package: .*versionName='\([^']*\)'.*/\1/p")
+          if [[ -z "$version" || "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "Expected tag v$version for this APK, got $GITHUB_REF_NAME" >&2
+            exit 1
+          fi
+
+          umask 077
+          keystore=$(mktemp)
+          trap 'rm -f "$keystore"' EXIT
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          mkdir -p release
+          apk="scrctl-android-$GITHUB_REF_NAME.apk"
+          "$build_tools/apksigner" sign --ks "$keystore" \
+            --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --ks-pass env:ANDROID_KEYSTORE_PASSWORD --key-pass env:ANDROID_KEY_PASSWORD \
+            --out "release/$apk" "$unsigned"
+          "$build_tools/apksigner" verify --print-certs "release/$apk"
+          cp build/scrctl-android-sources.tar.gz release/
+          (cd release && sha256sum "$apk" scrctl-android-sources.tar.gz > SHA256SUMS.txt)
+      - name: Upload signed release assets
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: scrctl-android-release
+          path: release/
+          if-no-files-found: error
+
+  publish:
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: scrctl-android-release
+          path: release
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          (cd release && sha256sum -c SHA256SUMS.txt)
+          gh release create "$GITHUB_REF_NAME" release/* \
+            --verify-tag --title "$GITHUB_REF_NAME" --generate-notes
