@@ -2,6 +2,7 @@ plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
 android {
     namespace = "org.scrctl.android"
     compileSdk = 36
+    ndkVersion = "29.0.14206865"
     defaultConfig {
         applicationId = "org.scrctl.android"
         minSdk = 26
