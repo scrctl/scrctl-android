@@ -1,7 +1,7 @@
 # Android integration
 
-XDB is pinned to a 1.2.0 development snapshot, commit
-9d607ee5e7ed97fbc4b4ab21ddaabfc054b90e7c.
+XDB is pinned to 1.7.0, commit
+181c0cba0f70b5de36a20e686a26dcfd7d58ca34.
 The build script rejects another commit or tracked SDK modifications. The App
 never runs an external xdb executable, changes XDB_PORT, reads pairing records,
 or implements discovery independently of the pinned SDK.
@@ -12,20 +12,23 @@ or implements discovery independently of the pinned SDK.
   transient PIN and cancellation. DDI uses cacheDir/ddi; ordinary preparation does
   not request replacement. Completed device changes cannot be rolled back on cancel.
 - Mirroring owns a device session. Separate attached clients receive frames and
-  send input. Software HEVC decoding occurs in Server. JNI validates BGRA geometry,
+  send input. The Server prefers MediaCodec and can fall back to software. The
+  device page allows a software override for the next connection. The mirror menu
+  reports the decoder selected by the Server. JNI validates BGRA geometry,
   respects row pitch and converts channels directly into a Bitmap.
 - The View holds one displayed and one pending frame. It drops superseded pending
   frames rather than accumulating UI callbacks. Display and input use the same
   geometry snapshot, visible-panel crop and inverse rotation. Unknown geometry
-  disables coordinate input. Multitouch releases the single supported contact.
+  disables coordinate input. Multi-touch forwards up to five contacts.
 - Input move events coalesce; discrete down/up ordering is retained. Input failure
   closes the session so best-effort server cleanup releases held state.
 - Backgrounding/exit invalidates the generation, interrupts clients immediately,
   then drains workers and tears down Server off the UI thread. No foreground
   service or background decoding mode is implemented.
-- Default-network/address changes are debounced. Loss stops the session; a new
-  network or return to foreground creates a new Server/client generation and
-  attempts the selected mirror once. Failures remain visible; no tight retry loop.
+- Default-network changes are debounced. Loss stops the session. Discovery
+  resumes when another network is available, and the user chooses Connect to
+  start another mirror. Returning to the foreground also starts on the device
+  list.
 - MulticastLock is held only while the Activity is started. Target SDK 36 uses
   INTERNET for LAN sockets; ACCESS_LOCAL_NETWORK is intentionally not requested
   as if target 37. Raising the target requires a separate permission migration.

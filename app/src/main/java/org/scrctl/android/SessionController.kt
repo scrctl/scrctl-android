@@ -12,9 +12,12 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
 class RpcFailure(val code: String, message: String) : Exception(message)
-data class Device(val udid: String, val name: String, val pairing: String, val connection: String)
+data class Device(val udid: String, val name: String, val pairing: String, val connection: String) {
+    val isPaired: Boolean get() = pairing == "record_present"
+}
 data class UiState(val message: String, val busy: Boolean = false, val mirroring: Boolean = false,
-                   val pin: String? = null, val devices: List<Device>? = null)
+                   val pin: String? = null, val devices: List<Device>? = null,
+                   val decoder: String? = null, val cancellable: Boolean = false)
 
 class SessionController(private val context: Context, private val files: File, private val cache: File,
                         private val update: (UiState) -> Unit, private val frame: (VideoFrame) -> Unit) {
@@ -31,7 +34,9 @@ class SessionController(private val context: Context, private val files: File, p
     @Volatile private var inputClient = 0L
     @Volatile private var owner = 0L
     @Volatile private var selected = ""
+    @Volatile private var selectedAddress = ""
     @Volatile private var wantMirror = false
+    @Volatile private var preferHardware = true
     @Volatile var running = false; private set
     private val touchLock = Any()
     private data class Touch(val contact: Int, val point: Point, val down: Boolean, val move: Boolean)
@@ -49,12 +54,12 @@ class SessionController(private val context: Context, private val files: File, p
             val data = event.optJSONObject("data") ?: JSONObject()
             if (event.optString("event") == "pin") {
                 pin = data.getString("pin")
-                emit(g, UiState("Enter this code on the iPhone", true, pin = pin))
+                emit(g, UiState("Enter this code on the iPhone", true, pin = pin, cancellable = true))
             }
             else {
                 val total = data.optLong("total")
                 val progress = if (total > 0) "${data.optString("file")} ${data.optLong("bytes") * 100 / total}%" else data.optString("message", "Preparing…")
-                emit(g, UiState(progress, true, pin = pin))
+                emit(g, UiState(progress, true, pin = pin, cancellable = true))
             }
         }
     }
@@ -78,7 +83,9 @@ class SessionController(private val context: Context, private val files: File, p
     fun resume() { foreground.set(true); restart("Starting local XDB…") }
     fun networkChanged(available: Boolean) {
         if (!foreground.get()) return
-        if (available) restart("Network changed; reconnecting…") else suspendSession("No network. Waiting for connectivity.")
+        wantMirror = false
+        if (available) restart("Network changed; discovering iPhones…")
+        else suspendSession("Network disconnected. Connect to Wi-Fi to discover your iPhone.")
     }
     private fun interrupt() { runtime.get().takeIf { it != 0L }?.let { NativeBridge.interruptAll(it) } }
     private fun stopCurrent() {
@@ -104,15 +111,21 @@ class SessionController(private val context: Context, private val files: File, p
                 if (!valid(g)) { stopCurrent(); return@execute }
                 val c = connect(r, g)
                 try { rpc(r, c, "server.info") } finally { NativeBridge.close(r, c) }
-                if (wantMirror && selected.isNotEmpty()) beginMirror(r, g, selected) else discover(r, g)
+                if (wantMirror) beginMirror(r, g, selected, selectedAddress) else discover(r, g)
             } catch (e: Exception) { emit(g, UiState(e.message ?: "Start failed")) }
         }
     }
     private fun suspendSession(message: String) {
-        val g = epoch.incrementAndGet(); interrupt(); emit(g, UiState(message))
+        val g = epoch.incrementAndGet(); interrupt(); emit(g, UiState(message, devices = emptyList()))
         operations.execute { stopCurrent() }
     }
-    fun pause() { foreground.set(false); epoch.incrementAndGet(); interrupt(); operations.execute { stopCurrent() } }
+    fun pause() {
+        foreground.set(false)
+        wantMirror = false
+        epoch.incrementAndGet()
+        interrupt()
+        operations.execute { stopCurrent() }
+    }
     fun close() {
         pause()
         operations.execute { video.shutdown(); inputs.shutdown(); operations.shutdown() }
@@ -126,13 +139,13 @@ class SessionController(private val context: Context, private val files: File, p
                 Device(it.optString("udid"), it.optString("name"), it.optString("pairing"), it.optString("connection"))
             } }
             val warnings = result.optJSONArray("warnings")
-            emit(g, UiState(if (list.isEmpty()) "No iPhone found. Keep Developer Mode open, or start Wi-Fi pairing." else "Select an iPhone",
+            emit(g, UiState(if (list.isEmpty()) "No iPhone found on this network." else if (list.none(Device::isPaired)) "Pair an iPhone to connect" else "Select an iPhone",
                 devices = list))
             if (warnings != null && warnings.length() > 0) emit(g, UiState("Discovery: ${warnings.join("; ")}", devices = list))
         } finally { requestClient.compareAndSet(c, 0); NativeBridge.close(r, c) }
     }
     private fun operation(message: String, body: (Long, Long, Long) -> Unit) {
-        val g = epoch.get(); cancelled.set(false); emit(g, UiState(message, true))
+        val g = epoch.get(); cancelled.set(false); emit(g, UiState(message, true, cancellable = true))
         operations.execute {
             if (!valid(g)) return@execute
             val r = runtime.get()
@@ -152,7 +165,7 @@ class SessionController(private val context: Context, private val files: File, p
         if (runtime.get() == 0L) restart("Discovering iPhones…")
         else operation("Discovering iPhones…") { r, g, _ -> discover(r, g) }
     }
-    fun pair() = operation("Waiting for iPhone pairing…") { r, g, c ->
+    fun pair() = operation("On iPhone, open Settings → Privacy & Security → Developer Mode and choose this scrctl device.") { r, g, c ->
         rpc(r, c, "pair", JSONObject().put("transport", "wifi").put("display_brand", "scrctl").put("timeout_ms", 120000))
         if (cancelled.get()) throw InterruptedException()
         discover(r, g)
@@ -168,19 +181,30 @@ class SessionController(private val context: Context, private val files: File, p
         val r = runtime.get(); val c = requestClient.get()
         if (r != 0L && c != 0L) NativeBridge.interrupt(r, c)
     }
-    fun mirror(udid: String) { selected = udid; wantMirror = true; restart("Connecting to iPhone…") }
+    fun mirror(udid: String, preferHardware: Boolean, address: String = "") {
+        selected = udid
+        selectedAddress = address
+        this.preferHardware = preferHardware
+        wantMirror = true
+        restart("Connecting to iPhone…")
+    }
     fun disconnect() { wantMirror = false; restart("Disconnected; discovering devices…") }
-    private fun beginMirror(r: Long, g: Long, udid: String) {
+    private fun beginMirror(r: Long, g: Long, udid: String, address: String) {
         val c = connect(r, g); owner = c; requestClient.set(c)
         try {
-            val session = rpc(r, c, "connection.open", JSONObject().put("udid", udid).put("wifi", "auto")).first
+            val target = if (address.isEmpty()) udid else {
+                val params = JSONObject().put("address", address)
+                if (udid.isNotEmpty()) params.put("udid", udid)
+                rpc(r, c, "connect", params).first.getString("udid")
+            }
+            val session = rpc(r, c, "connection.open", JSONObject().put("udid", target).put("transport", "wifi")).first
             rpc(r, c, "display.info")
-            rpc(r, c, "video.start", JSONObject().put("decode", true).put("hardware_decode", false))
+            rpc(r, c, "video.start", JSONObject().put("hardware_decode", preferHardware))
             val attachment = session.getString("attachment")
             inputClient = connect(r, g)
             rpc(r, inputClient, "connection.attach", JSONObject().put("attachment", attachment))
             running = true; requestClient.set(0)
-            emit(g, UiState("Mirroring • software decode", mirroring = true))
+            emit(g, UiState("Waiting for video…", mirroring = true))
             videoTask = video.submit { receive(r, g, attachment) }
         } catch (e: Exception) { wantMirror = false; stopCurrent(); throw e }
     }
@@ -188,12 +212,28 @@ class SessionController(private val context: Context, private val files: File, p
         var c = 0L
         try {
             c = connect(r, g); rpc(r, c, "connection.attach", JSONObject().put("attachment", attachment))
-            var serial = 0L; var statusAt = 0L
+            var serial = 0L
+            var statusAt = 0L
+            var decoder: String? = null
+            val firstFrameDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15)
             while (valid(g) && running) {
                 val started = System.nanoTime()
+                if (serial == 0L && started >= firstFrameDeadline) {
+                    throw IllegalStateException("No video received. Unlock the iPhone and check that DDI is prepared.")
+                }
                 if (started >= statusAt) {
                     val status = rpc(r, c, "media.status").first
                     if (status.optString("error").isNotEmpty()) throw IllegalStateException(status.getString("error"))
+                    val backend = status.optString("video_decoder")
+                    if (backend.isNotEmpty() && backend != decoder) {
+                        decoder = backend
+                        val label = when (backend) {
+                            "libavcodec/hevc_mediacodec" -> "MediaCodec"
+                            "libavcodec/hevc" -> "Software"
+                            else -> backend
+                        }
+                        emit(g, UiState("Mirroring", mirroring = true, decoder = label))
+                    }
                     statusAt = started + 1_000_000_000
                 }
                 try {

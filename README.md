@@ -1,10 +1,9 @@
 # scrctl-android
 
-A focused native Kotlin / Material 3 Android frontend for iPhone Wi-Fi mirroring
-and control, and an application-sandbox validation host for XDeviceBridge.
+A native Kotlin / Material 3 Android app for iPhone Wi-Fi mirroring and control.
 
-The SDK is pinned to **XDeviceBridge 1.4.0**, commit
-`2ac3ae68335280aa80c1ab084a46e19da029fa10`.
+The SDK is pinned to **XDeviceBridge 1.7.0**, commit
+`181c0cba0f70b5de36a20e686a26dcfd7d58ca34`.
 The App embeds libxdb_server and libxdb_client through JNI. It never executes an
 external xdb program. Pairing records belong to xdb in App-private persistent
 storage; the App does not parse credentials. DDI uses App cache storage.
@@ -13,10 +12,10 @@ The initial discovery-to-mirroring implementation is available. Build checks,
 automated tests and real-device acceptance are recorded separately in
 [docs/VALIDATION.md](docs/VALIDATION.md).
 
-## Initial scope
+## Features
 
 - Wi-Fi discovery, pairing PIN/progress/cancellation and DDI preparation.
-- Software-decoded video with aspect ratio, rotation and mapped multi-touch (up to five fingers).
+- MediaCodec-preferred video with software fallback, rotation and mapped multi-touch (up to five fingers).
 - Home, volume and side-button controls.
 - Foreground-only sessions; network changes and backgrounding cancel native work.
 
@@ -64,7 +63,12 @@ its state and prepare again before mirroring. Ordinary test runs skip this case.
 
 Select an iPhone from the initial list, prepare DDI if necessary, then Connect.
 The mirror is fullscreen; Android Back returns to the list. Its small control menu
-provides Home, volume and Lock. For first-time Wi-Fi pairing, select Wi-Fi pair,
+shows the active decoder and provides Home, volume and Lock. Turn off **Prefer
+hardware decoding** on the device page to use software on the next connection.
+If discovery cannot find an already paired iPhone, use **Connect by address**
+with its current IP address or hostname. If the network changes, connect again
+from the device list.
+For first-time Wi-Fi pairing, select Wi-Fi pair,
 then choose the Android host on the iPhone's Developer Mode page and enter the
 transient PIN displayed by the App. Credentials remain in App-private storage.
 

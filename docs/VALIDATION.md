@@ -1,7 +1,7 @@
 # Android validation status
 
-Current SDK pin: **XDeviceBridge 1.4.0**, commit
-`2ac3ae68335280aa80c1ab084a46e19da029fa10`.
+Current SDK pin: **XDeviceBridge 1.7.0**, commit
+`181c0cba0f70b5de36a20e686a26dcfd7d58ca34`.
 App ABI: arm64-v8a. This App primarily validates embedding XDeviceBridge in an
 Android application. Results below cover development/debug APKs, not a release
 or store-distributed build.
@@ -118,3 +118,19 @@ Android Gradle plugin. Do not clear App data or uninstall it as routine test
 cleanup. Pairing records remain SDK-owned in App-private persistent storage.
 Destructive DDI lifecycle tests require explicit opt-in; read-only status checks
 should resolve uncertain device state before retrying an installation.
+
+## XDeviceBridge 1.7.0 and device screen update (2026-11-21)
+
+Debug APK packaging, local unit tests and lint passed. Before the device
+screen restyle, a debug APK with the same SDK and manual address connection
+was installed over the existing App on Xiaomi 13 Ultra. The App found no
+mDNS devices on that network, but connected using the iPhone's IP address
+and its existing App-private pairing record. The mirror menu reported
+MediaCodec, Android instantiated `c2.qti.hevc.decoder`, and two captures of
+the mirror differed. The existing pairing record was unchanged. No input
+was sent to the iPhone. The software-override run was interrupted before
+verification, and the final restyled device screen was built but not deployed.
+
+The embedded SDK instrumentation cases passed. The synthetic Android
+NsdManager registration test timed out waiting for discovery on this network.
+The live hardware result therefore covers direct Wi-Fi connection.
