@@ -38,6 +38,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var root: FrameLayout
     private lateinit var listPage: LinearLayout
     private lateinit var mirrorPage: FrameLayout
+    private lateinit var mirrorControls: FrameLayout
     private lateinit var deviceList: LinearLayout
     private lateinit var mirror: MirrorView
     private lateinit var status: TextView
@@ -150,8 +151,10 @@ class MainActivity : AppCompatActivity() {
         mirrorPage = FrameLayout(this).apply { visibility = View.GONE }
         mirror = MirrorView(this)
         mirrorPage.addView(mirror, FrameLayout.LayoutParams(-1, -1))
+        mirrorControls = FrameLayout(this).apply { visibility = View.GONE }
+        mirrorPage.addView(mirrorControls, FrameLayout.LayoutParams(-1, -1))
         val back = MaterialButton(this).apply { text = "‹"; contentDescription = "Back to devices"; setOnClickListener { disconnect() } }
-        mirrorPage.addView(back, FrameLayout.LayoutParams(dp(56), dp(48), Gravity.TOP or Gravity.START).apply { setMargins(dp(12), dp(12), dp(12), 0) })
+        mirrorControls.addView(back, FrameLayout.LayoutParams(dp(56), dp(48), Gravity.TOP or Gravity.START).apply { setMargins(dp(12), dp(12), dp(12), 0) })
         val menu = MaterialButton(this).apply { text = "⋮"; contentDescription = "iPhone controls" }
         menu.setOnClickListener {
             PopupMenu(this, menu).apply {
@@ -163,7 +166,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }.show()
         }
-        mirrorPage.addView(menu, FrameLayout.LayoutParams(dp(56), dp(48), Gravity.TOP or Gravity.END).apply { setMargins(dp(12), dp(12), dp(12), 0) })
+        mirrorControls.addView(menu, FrameLayout.LayoutParams(dp(56), dp(48), Gravity.TOP or Gravity.END).apply { setMargins(dp(12), dp(12), dp(12), 0) })
         ViewCompat.setOnApplyWindowInsetsListener(mirrorPage) { _, insets ->
             val cutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout())
             for (control in listOf(back, menu)) {
@@ -178,7 +181,11 @@ class MainActivity : AppCompatActivity() {
         root.addView(mirrorPage, FrameLayout.LayoutParams(-1, -1))
         controller = SessionController(applicationContext, filesDir, cacheDir, { render(it) }, { mirror.submit(it) })
         mirror.acceptsFrame = controller::acceptsFrame; mirror.onTouch = controller::touch
-        onBackPressedDispatcher.addCallback(this) { if (state.mirroring) disconnect() else finish() }
+        onBackPressedDispatcher.addCallback(this) {
+            if (state.mirroring) {
+                mirrorControls.visibility = if (mirrorControls.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+            } else finish()
+        }
         setContentView(root); render(state)
     }
     private fun showAddressDialog() {
@@ -221,6 +228,11 @@ class MainActivity : AppCompatActivity() {
     private fun showMirror(show: Boolean) {
         listPage.visibility = if (show) View.GONE else View.VISIBLE
         mirrorPage.visibility = if (show) View.VISIBLE else View.GONE
+        mirrorControls.visibility = View.GONE
+        if (show && !preferences.getBoolean("mirror_controls_hint", false)) {
+            android.widget.Toast.makeText(this, "Press Back to show mirror controls", android.widget.Toast.LENGTH_SHORT).show()
+            preferences.edit().putBoolean("mirror_controls_hint", true).apply()
+        }
         mirror.keepScreenOn = show
         WindowInsetsControllerCompat(window, root).apply {
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE

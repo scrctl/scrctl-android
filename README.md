@@ -62,7 +62,7 @@ run leaves the DDI installed. An interrupted/failed run can leave it absent; que
 its state and prepare again before mirroring. Ordinary test runs skip this case.
 
 Select an iPhone from the initial list, prepare DDI if necessary, then Connect.
-The mirror is fullscreen; Android Back returns to the list. Its small control menu
+The mirror is fullscreen; Android Back shows or hides the mirror controls. Use the back arrow to return to the device list. Its small control menu
 shows the active decoder and provides Home, volume and Lock. Turn off **Prefer
 hardware decoding** on the device page to use software on the next connection.
 If discovery cannot find an already paired iPhone, use **Connect by address**
