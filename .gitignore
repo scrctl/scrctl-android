@@ -6,3 +6,7 @@ local.properties
 .idea/
 *.iml
 *.apk
+
+/apps/android/app/src/main/jniLibs/
+/apps/android/keystore/
+/apps/android/keystore.properties

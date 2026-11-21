@@ -1,0 +1,88 @@
+name: GUI Android Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    environment: Release
+    env:
+      HAS_ANDROID_KEYSTORE: ${{ secrets.RELEASE_ANDROID_KEYSTORE_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-36 build-tools;35.0.0 ndk;27.2.12479018"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: vendor/scrctl/core
+      - name: Build Android core
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018"
+          cargo install cargo-ndk --locked --version 4.1.2
+          ./scripts/build-android-core.sh
+      - name: Require release signing
+        if: env.HAS_ANDROID_KEYSTORE != 'true'
+        run: |
+          echo "Configure the RELEASE_ANDROID signing secrets in the Release environment before publishing." >&2
+          exit 1
+      - name: Configure release signing
+        working-directory: apps/android
+        env:
+          KEYSTORE_BASE64: ${{ secrets.RELEASE_ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.RELEASE_ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.RELEASE_ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.RELEASE_ANDROID_KEY_ALIAS }}
+        run: |
+          mkdir -p keystore
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > keystore/release.jks
+          umask 077
+          cat > keystore.properties <<EOF
+          storeFile=keystore/release.jks
+          storePassword=$STORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+      - name: Build signed release APK
+        working-directory: apps/android
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          marketing="${tag#v}"
+          marketing="${marketing%%-*}"
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease --no-daemon \
+            -Popenscreens.versionCode="$(git rev-list --count HEAD)" \
+            -Popenscreens.versionName="$marketing"
+          cp app/build/outputs/apk/release/app-release.apk \
+            "$GITHUB_WORKSPACE/OpenScreens-${tag}-android.apk"
+      - name: Publish signed Android release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="$GITHUB_REF_NAME"
+          extra=()
+          if [[ "$tag" == *-* ]]; then extra+=(--prerelease); fi
+          gh release create "$tag" "OpenScreens-${tag}-android.apk" \
+            --title "OpenScreens ${tag#v}" --generate-notes --verify-tag "${extra[@]}"

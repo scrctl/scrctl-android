@@ -1,0 +1,57 @@
+name: GUI Android
+
+on:
+  push:
+    paths:
+      - 'apps/android/**'
+      - 'scripts/build-android-core.sh'
+      - 'vendor/scrctl'
+      - '.gitmodules'
+      - '.github/workflows/gui-android.yml'
+  pull_request:
+    paths:
+      - 'apps/android/**'
+      - 'scripts/build-android-core.sh'
+      - 'vendor/scrctl'
+      - '.gitmodules'
+      - '.github/workflows/gui-android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-36 build-tools;35.0.0 ndk;27.2.12479018"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: vendor/scrctl/core
+      - name: Build Android core
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018"
+          cargo install cargo-ndk --locked --version 4.1.2
+          ./scripts/build-android-core.sh
+      - name: Build and test a debug-signed APK
+        working-directory: apps/android
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug :app:testDebugUnitTest --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OpenScreens-android-pr-debug
+          path: apps/android/app/build/outputs/apk/debug/*.apk

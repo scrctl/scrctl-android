@@ -1,5 +1,7 @@
 # scrctl-android
 
+The VNC and Mac Screen Sharing GUI lives in [apps/android](apps/android/README.md). This root Gradle project remains the iPhone mirroring client.
+
 A focused native Kotlin / Material 3 Android frontend for iPhone Wi-Fi mirroring
 and control, and an application-sandbox validation host for XDeviceBridge.
 
