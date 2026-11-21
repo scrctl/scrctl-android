@@ -15,8 +15,9 @@ concurrency:
 jobs:
   android:
     runs-on: ubuntu-latest
+    environment: Release
     env:
-      HAS_ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+      HAS_ANDROID_KEYSTORE: ${{ secrets.RELEASE_ANDROID_KEYSTORE_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -43,15 +44,15 @@ jobs:
       - name: Require release signing
         if: env.HAS_ANDROID_KEYSTORE != 'true'
         run: |
-          echo "Configure the Android release keystore secrets before publishing." >&2
+          echo "Configure the RELEASE_ANDROID signing secrets in the Release environment before publishing." >&2
           exit 1
       - name: Configure release signing
         working-directory: apps/android
         env:
-          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEYSTORE_BASE64: ${{ secrets.RELEASE_ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.RELEASE_ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.RELEASE_ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.RELEASE_ANDROID_KEY_ALIAS }}
         run: |
           mkdir -p keystore
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > keystore/release.jks
