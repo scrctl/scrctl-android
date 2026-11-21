@@ -1,3 +1,6 @@
 [submodule "xdb"]
 	path = xdb
 	url = https://github.com/scrctl/XDeviceBridge.git
+[submodule "vendor/scrctl"]
+	path = vendor/scrctl
+	url = https://github.com/scrctl/scrctl.git
