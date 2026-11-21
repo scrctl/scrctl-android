@@ -24,4 +24,11 @@ for abi in arm64-v8a armeabi-v7a x86_64; do
 done
 rm -rf "$APP/jniLibs"
 mv "$stage/jniLibs" "$APP/jniLibs"
-cp "$stage/bindings/uniffi/rfb_ffi/rfb_ffi.kt" "$APP/java/uniffi/rfb_ffi/rfb_ffi.kt"
+binding="$APP/java/uniffi/rfb_ffi/rfb_ffi.kt"
+generated="$stage/bindings/uniffi/rfb_ffi/rfb_ffi.kt"
+# UniFFI can vary trailing whitespace without changing the binding.
+if [[ ! -f "$binding" ]] || ! cmp -s \
+  <(sed 's/[[:blank:]]*$//' "$generated") \
+  <(sed 's/[[:blank:]]*$//' "$binding"); then
+  cp "$generated" "$binding"
+fi
